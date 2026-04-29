@@ -107,15 +107,25 @@ struct PaywallView: View {
         }
     }
 
-    // MARK: - 復元
+    // MARK: - 復元・リンク
 
     private var restoreButton: some View {
-        Button {
-            Task { await subManager.restore() }
-        } label: {
-            Text("購入を復元する")
-                .font(.caption)
-                .foregroundColor(.secondary)
+        VStack(spacing: 12) {
+            Button {
+                Task { await subManager.restore() }
+            } label: {
+                Text("購入を復元する")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            HStack(spacing: 16) {
+                Link("利用規約", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                Text("・").foregroundColor(.secondary)
+                Link("プライバシーポリシー", destination: URL(string: "https://skyscanning.jp/privacy-policy/")!)
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
         }
     }
 }
