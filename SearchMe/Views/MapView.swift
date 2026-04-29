@@ -192,10 +192,16 @@ final class MapViewModel: ObservableObject {
     @Published var members: [FamilyMember] = []
     @Published var shelters: [Shelter] = []
     @Published var isLoading = false
-    @Published var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 35.6762, longitude: 139.6503),
-        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-    )
+    @Published var region: MKCoordinateRegion
+
+    init() {
+        let center = LocationService.shared.lastLocation?.coordinate
+            ?? CLLocationCoordinate2D(latitude: 35.6762, longitude: 139.6503)
+        region = MKCoordinateRegion(
+            center: center,
+            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+        )
+    }
 
     func allAnnotations(showShelters: Bool) -> [MapAnnotationItem] {
         let memberItems = members.filter { $0.hasLocation }.map { MapAnnotationItem.member($0) }
