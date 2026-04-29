@@ -14,9 +14,15 @@ struct MainTabView: View {
             MapView()
                 .tabItem { Label("マップ", systemImage: "map.fill") }
                 .tag(1)
-            FamilyListView()
-                .tabItem { Label("家族", systemImage: "person.3.fill") }
-                .tag(2)
+            Group {
+                if subManager.isSubscribed {
+                    DashboardView()
+                } else {
+                    FamilyListView()
+                }
+            }
+            .tabItem { Label("家族", systemImage: "person.3.fill") }
+            .tag(2)
             SettingsView()
                 .tabItem { Label("設定", systemImage: "gearshape.fill") }
                 .tag(3)

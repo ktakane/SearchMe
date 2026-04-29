@@ -2,8 +2,10 @@ import SwiftUI
 
 struct FamilyListView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var subManager: SubscriptionManager
     @State private var members: [FamilyMember] = []
     @State private var isLoading = false
+    @State private var showPaywall = false
 
     var body: some View {
         NavigationView {
@@ -17,8 +19,11 @@ struct FamilyListView: View {
                             .foregroundColor(.secondary)
                     }
                 } else {
-                    List(members) { member in
-                        MemberRow(member: member, isMe: member.id == appState.myMemberId)
+                    List {
+                        upgradeBanner
+                        ForEach(members) { member in
+                            MemberRow(member: member, isMe: member.id == appState.myMemberId)
+                        }
                     }
                 }
             }
@@ -37,6 +42,32 @@ struct FamilyListView: View {
                 }
             }
             .onAppear { Task { await fetch() } }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView().environmentObject(subManager)
+            }
+        }
+    }
+
+    private var upgradeBanner: some View {
+        Button { showPaywall = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "star.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("家族ダッシュボード")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+                    Text("安否状況・バッテリーを一覧で確認")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 4)
         }
     }
 
