@@ -49,6 +49,8 @@ struct SettingsView: View {
     }
 
     private func reset() {
+        let memberId = appState.myMemberId
+        Task { try? await APIService.shared.leaveGroup(memberId: memberId) }
         UserDefaults.standard.removeObject(forKey: "myMemberId")
         UserDefaults.standard.removeObject(forKey: "myName")
         UserDefaults.standard.removeObject(forKey: "groupId")

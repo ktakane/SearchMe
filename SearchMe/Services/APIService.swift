@@ -43,6 +43,14 @@ final class APIService {
         let _: EmptyResponse = try await post(path: "/disaster/deactivate", body: body)
     }
 
+    func leaveGroup(memberId: String) async throws {
+        guard let url = URL(string: base + "/members/\(memberId)") else { throw URLError(.badURL) }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        let (data, _) = try await URLSession.shared.data(for: req)
+        let _ = try JSONDecoder().decode(EmptyResponse.self, from: data)
+    }
+
     // MARK: - Private
 
     private struct EmptyResponse: Codable {}

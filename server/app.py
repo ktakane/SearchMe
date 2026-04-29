@@ -308,6 +308,17 @@ def deactivate_disaster():
             'UPDATE disaster_events SET is_active=0, deactivated_at=? WHERE group_id=? AND is_active=1',
             (now_iso(), group_id)
         )
+        conn.execute(
+            'UPDATE members SET latitude=NULL, longitude=NULL, battery=NULL, updated_at=NULL WHERE group_id=?',
+            (group_id,)
+        )
+    return jsonify({'ok': True})
+
+@app.route('/api/members/<member_id>', methods=['DELETE'])
+def delete_member(member_id):
+    with get_db() as conn:
+        conn.execute('DELETE FROM device_tokens WHERE member_id = ?', (member_id,))
+        conn.execute('DELETE FROM members WHERE id = ?', (member_id,))
     return jsonify({'ok': True})
 
 # MARK: - 管理画面
