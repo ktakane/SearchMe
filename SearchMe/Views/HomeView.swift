@@ -136,6 +136,7 @@ struct HomeView: View {
             Text("2. 災害発生時に「災害モードを開始」をタップします。")
             Text("3. 家族のマップ画面にあなたの位置が表示されます。")
             Text("4. 意識がない場合でも、iPhoneが位置情報を自動送信します。")
+            Text("5. 震度5弱以上の地震が発生した場合は、自動で災害モードが開始されます。")
         }
         .font(.caption)
         .foregroundColor(.secondary)
