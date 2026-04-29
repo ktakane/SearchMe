@@ -216,7 +216,13 @@ final class MapViewModel: ObservableObject {
     }
 
     func loadShelters() {
-        let center = region.center
+        let center: CLLocationCoordinate2D
+        if let gps = LocationService.shared.lastLocation {
+            center = gps.coordinate
+        } else {
+            center = region.center
+        }
+        region.center = center
         shelters = ShelterService.shared.nearbyShelters(lat: center.latitude, lng: center.longitude, radiusKm: 3.0)
     }
 }
