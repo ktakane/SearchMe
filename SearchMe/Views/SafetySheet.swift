@@ -4,6 +4,7 @@ struct SafetySheet: View {
     @Binding var isPresented: Bool
     @EnvironmentObject private var appState: AppState
     let isStopping: Bool
+    var isReminder: Bool = false
     let onCompleted: (() -> Void)?
 
     @State private var isSending = false
@@ -61,7 +62,7 @@ struct SafetySheet: View {
             .navigationTitle("安否確認")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if !isStopping {
+                if !isStopping && !isReminder {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("閉じる") { isPresented = false }
                     }

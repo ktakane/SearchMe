@@ -24,10 +24,11 @@ struct MainTabView: View {
         .onChange(of: appState.showSafetyReminder) { newValue in
             if newValue { showSafetyReminderSheet = true }
         }
-        .sheet(isPresented: $showSafetyReminderSheet) {
+        .fullScreenCover(isPresented: $showSafetyReminderSheet) {
             SafetySheet(
                 isPresented: $showSafetyReminderSheet,
                 isStopping: false,
+                isReminder: true,
                 onCompleted: {
                     selectedTab = 0
                     appState.showSafetyReminder = false
