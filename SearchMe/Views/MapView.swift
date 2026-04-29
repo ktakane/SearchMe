@@ -211,6 +211,8 @@ final class MapViewModel: ObservableObject {
             members = fetched
             if let first = fetched.first(where: { $0.hasLocation }) {
                 region.center = CLLocationCoordinate2D(latitude: first.latitude!, longitude: first.longitude!)
+            } else if let gps = LocationService.shared.lastLocation {
+                region.center = gps.coordinate
             }
         }
     }
