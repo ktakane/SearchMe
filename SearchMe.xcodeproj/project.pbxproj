@@ -11,6 +11,7 @@
 		22EF85DD5A07FB5216C6DF87 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B20DC50F0B291A6ADE1376B /* APIService.swift */; };
 		3262FC604591ECA0BFE052D9 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089955F0EB31DC189692D042 /* MapView.swift */; };
 		51E7FCE2A90CF25D5BDB935B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22344778D239AE1731AABEEB /* ContentView.swift */; };
+		5F5A19B66969B6146888F07B /* ShelterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC09FE05787B31AF4159B4C0 /* ShelterService.swift */; };
 		72A784818E7E6E91C57EE064 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72A68CAC5A86AAEB814D0E5D /* SetupView.swift */; };
 		7486B753304DA7AEC744EC41 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99A25E9A3572A2DB87B2A6C1 /* LocationService.swift */; };
 		76B7D483A059A37780D675D7 /* SearchMeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037B779801F2ECD289FE34D2 /* SearchMeApp.swift */; };
@@ -38,6 +39,7 @@
 		72A68CAC5A86AAEB814D0E5D /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		99A25E9A3572A2DB87B2A6C1 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		D9D560994186E434CE8548BD /* SearchMe.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SearchMe.entitlements; sourceTree = "<group>"; };
+		EC09FE05787B31AF4159B4C0 /* ShelterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelterService.swift; sourceTree = "<group>"; };
 		ECC5F92298135FF8BE907D90 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -86,6 +88,7 @@
 				1B20DC50F0B291A6ADE1376B /* APIService.swift */,
 				2AC978088B3A72BD3F20DCB0 /* AppState.swift */,
 				99A25E9A3572A2DB87B2A6C1 /* LocationService.swift */,
+				EC09FE05787B31AF4159B4C0 /* ShelterService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -186,6 +189,7 @@
 				76B7D483A059A37780D675D7 /* SearchMeApp.swift in Sources */,
 				EC3EFB340B8273B0C0C20C05 /* SettingsView.swift in Sources */,
 				72A784818E7E6E91C57EE064 /* SetupView.swift in Sources */,
+				5F5A19B66969B6146888F07B /* ShelterService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

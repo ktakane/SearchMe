@@ -89,7 +89,7 @@ final class ShelterService {
         for s in shelters {
             sqlite3_bind_int(stmt,  1, Int32(s.id))
             sqlite3_bind_text(stmt, 2, (s.name as NSString).utf8String, -1, nil)
-            sqlite3_bind_text(stmt, 3, (s.address ?? "" as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 3, ((s.address ?? "") as NSString).utf8String, -1, nil)
             sqlite3_bind_double(stmt, 4, s.lat)
             sqlite3_bind_double(stmt, 5, s.lng)
             sqlite3_bind_int(stmt, 6, Int32(s.earthquake))
