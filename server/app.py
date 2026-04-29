@@ -27,7 +27,8 @@ APNS_HOST      = 'https://api.sandbox.push.apple.com'  # 本番: api.push.apple.
 
 # 気象庁API
 JMA_URL = 'https://www.jma.go.jp/bosai/quake/data/list.json'
-TRIGGER_INTENSITY = ['5-', '5+', '6-', '6+', '7']
+TRIGGER_INTENSITY    = ['5-', '5+', '6-', '6+', '7']
+BATTERY_THRESHOLDS   = [20, 10, 5]
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -36,7 +37,7 @@ def get_db():
 
 def migrate_db():
     with get_db() as conn:
-        for col in ('safety_status', 'safety_updated_at'):
+        for col in ('safety_status', 'safety_updated_at', 'battery_alerted'):
             try:
                 conn.execute(f'ALTER TABLE members ADD COLUMN {col} TEXT')
             except Exception:
@@ -308,15 +309,51 @@ def update_location():
         return jsonify({'error': 'missing fields'}), 400
 
     with get_db() as conn:
-        existing = conn.execute(
-            'SELECT id FROM members WHERE id = ? AND group_id = ?', (member_id, group_id)
+        member = conn.execute(
+            'SELECT name, battery_alerted FROM members WHERE id = ? AND group_id = ?',
+            (member_id, group_id)
         ).fetchone()
-        if not existing:
+        if not member:
             return jsonify({'error': 'member not found'}), 404
         conn.execute(
             'UPDATE members SET latitude=?, longitude=?, battery=?, updated_at=? WHERE id=?',
             (latitude, longitude, battery, timestamp, member_id)
         )
+
+        # バッテリー低下アラート（災害モード中のみ）
+        if battery is not None and battery >= 0:
+            active_disaster = conn.execute(
+                'SELECT 1 FROM disaster_events WHERE group_id = ? AND is_active = 1', (group_id,)
+            ).fetchone()
+            if active_disaster:
+                battery_pct   = int(battery * 100)
+                alerted_str   = member['battery_alerted'] or ''
+                alerted       = set(x for x in alerted_str.split(',') if x)
+                crossed       = [t for t in BATTERY_THRESHOLDS if battery_pct <= t and str(t) not in alerted]
+                if crossed:
+                    for t in crossed:
+                        alerted.add(str(t))
+                    conn.execute(
+                        'UPDATE members SET battery_alerted = ? WHERE id = ?',
+                        (','.join(alerted), member_id)
+                    )
+                    tokens = conn.execute(
+                        'SELECT token FROM device_tokens WHERE group_id = ? AND member_id != ?',
+                        (group_id, member_id)
+                    ).fetchall()
+                    payload = {
+                        'aps': {
+                            'alert': {
+                                'title': '⚡ バッテリー低下',
+                                'body': f'{member["name"]}さんのバッテリーが残り{battery_pct}%です'
+                            },
+                            'sound': 'default'
+                        },
+                        'type': 'battery_alert'
+                    }
+                    for row in tokens:
+                        threading.Thread(target=send_apns, args=(row['token'], payload), daemon=True).start()
+
     return jsonify({'ok': True})
 
 # MARK: - 災害モード
@@ -347,7 +384,7 @@ def deactivate_disaster():
             (now_iso(), group_id)
         )
         conn.execute(
-            'UPDATE members SET latitude=NULL, longitude=NULL, battery=NULL, updated_at=NULL WHERE group_id=?',
+            'UPDATE members SET latitude=NULL, longitude=NULL, battery=NULL, updated_at=NULL, battery_alerted=NULL WHERE group_id=?',
             (group_id,)
         )
     return jsonify({'ok': True})
