@@ -96,7 +96,7 @@ struct PaywallView: View {
                     icon:      plan.icon,
                     color:     plan.color,
                     priceText: product?.displayPrice ?? "---",
-                    period:    isYearly ? "/ 年" : "/ 月",
+                    period:    isYearly ? "/ 1年（自動更新）" : "/ 1ヶ月（自動更新）",
                     isLoading: subManager.isPurchasing,
                     onTap: {
                         guard let p = product else { return }
@@ -111,6 +111,13 @@ struct PaywallView: View {
 
     private var restoreButton: some View {
         VStack(spacing: 12) {
+            Text(isYearly
+                 ? "プランは1年ごとに自動更新されます。次の更新日の24時間前までにキャンセルしない限り、自動的に課金されます。"
+                 : "プランは1ヶ月ごとに自動更新されます。次の更新日の24時間前までにキャンセルしない限り、自動的に課金されます。")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+
             Button {
                 Task { await subManager.restore() }
             } label: {
