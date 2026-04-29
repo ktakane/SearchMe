@@ -122,7 +122,13 @@ struct DashboardView: View {
 
     private func fetch() async {
         isLoading = true
-        members = (try? await APIService.shared.fetchMembers(groupId: appState.groupId)) ?? []
+        do {
+            members = try await APIService.shared.fetchMembers(groupId: appState.groupId)
+        } catch APIError.groupDisbanded {
+            appState.clearGroup()
+        } catch {
+            members = []
+        }
         isLoading = false
     }
 }

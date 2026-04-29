@@ -43,7 +43,7 @@ struct MapView: View {
                     }
 
                     Button {
-                        Task { await viewModel.fetch(groupId: appState.groupId) }
+                        Task { await viewModel.fetch(groupId: appState.groupId, onGroupDisbanded: { appState.clearGroup() }) }
                     } label: {
                         Image(systemName: "arrow.clockwise.circle.fill")
                             .font(.system(size: 44))
@@ -60,7 +60,7 @@ struct MapView: View {
                 }
             }
             .onAppear {
-                Task { await viewModel.fetch(groupId: appState.groupId) }
+                Task { await viewModel.fetch(groupId: appState.groupId, onGroupDisbanded: { appState.clearGroup() }) }
             }
             .sheet(item: $selectedShelter) { shelter in
                 ShelterDetailSheet(shelter: shelter)
@@ -210,18 +210,21 @@ final class MapViewModel: ObservableObject {
         return memberItems + shelterItems
     }
 
-    func fetch(groupId: String) async {
+    func fetch(groupId: String, onGroupDisbanded: (() -> Void)? = nil) async {
         guard !groupId.isEmpty else { return }
         isLoading = true
         defer { isLoading = false }
-        if let fetched = try? await APIService.shared.fetchMembers(groupId: groupId) {
+        do {
+            let fetched = try await APIService.shared.fetchMembers(groupId: groupId)
             members = fetched
             if let first = fetched.first(where: { $0.hasLocation }) {
                 region.center = CLLocationCoordinate2D(latitude: first.latitude!, longitude: first.longitude!)
             } else if let gps = LocationService.shared.lastLocation {
                 region.center = gps.coordinate
             }
-        }
+        } catch APIError.groupDisbanded {
+            onGroupDisbanded?()
+        } catch {}
     }
 
     func loadShelters() {

@@ -3,6 +3,7 @@ import Foundation
 enum APIError: LocalizedError {
     case groupFull(max: Int)
     case ownerCannotLeave
+    case groupDisbanded
     case serverError(Int)
 
     var errorDescription: String? {
@@ -11,6 +12,8 @@ enum APIError: LocalizedError {
             return "グループの人数上限（\(max)名）に達しています"
         case .ownerCannotLeave:
             return "オーナーはグループから退出できません。グループを解散してください。"
+        case .groupDisbanded:
+            return "グループが解散されました"
         case .serverError(let code):
             return "サーバーエラー (\(code))"
         }
@@ -52,7 +55,12 @@ final class APIService {
     }
 
     func fetchMembers(groupId: String) async throws -> [FamilyMember] {
-        return try await get(path: "/groups/\(groupId)/members")
+        guard let url = URL(string: base + "/groups/\(groupId)/members") else { throw URLError(.badURL) }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        if let http = response as? HTTPURLResponse, http.statusCode == 404 {
+            throw APIError.groupDisbanded
+        }
+        return try JSONDecoder().decode([FamilyMember].self, from: data)
     }
 
     func sendLocation(_ payload: LocationPayload) async throws {
