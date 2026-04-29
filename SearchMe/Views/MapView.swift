@@ -111,10 +111,10 @@ struct MemberPin: View {
             }
             Text(member.name)
                 .font(.caption2.bold())
+                .foregroundColor(.white)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(.white.opacity(0.9))
-                .cornerRadius(4)
+                .background(Color.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 4))
             Text(member.updatedAtDisplay)
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -137,11 +137,11 @@ struct ShelterPin: View {
             }
             Text(shelter.name)
                 .font(.caption2)
+                .foregroundColor(.white)
                 .lineLimit(1)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 1)
-                .background(.white.opacity(0.9))
-                .cornerRadius(4)
+                .background(Color.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 4))
         }
     }
 }
