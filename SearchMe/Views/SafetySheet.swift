@@ -82,7 +82,7 @@ struct SafetySheet: View {
                 groupId:  appState.groupId,
                 status:   status
             )
-            scheduleSafetyReminder()
+            if !isStopping { scheduleSafetyReminder() }
             await MainActor.run {
                 isSending = false
                 isPresented = false

@@ -33,11 +33,16 @@ struct HomeView: View {
         } message: {
             Text("家族があなたの位置を確認できるようになります。")
         }
-        .sheet(isPresented: $showSafetySheet) {
+        .sheet(isPresented: $showSafetySheet, onDismiss: {
+            if safetySheetIsStopping {
+                stopDisasterMode()
+                safetySheetIsStopping = false
+            }
+        }) {
             SafetySheet(
                 isPresented: $showSafetySheet,
                 isStopping: safetySheetIsStopping,
-                onCompleted: safetySheetIsStopping ? stopDisasterMode : nil
+                onCompleted: nil
             )
             .environmentObject(appState)
         }
