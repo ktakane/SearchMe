@@ -1,6 +1,6 @@
 import Foundation
 
-struct FamilyMember: Identifiable, Codable {
+struct FamilyMember: Identifiable, Codable, Hashable {
     var id: String
     var name: String
     var latitude: Double?

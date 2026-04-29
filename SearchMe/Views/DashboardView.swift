@@ -24,6 +24,9 @@ struct DashboardView: View {
                 .padding()
             }
             .navigationTitle("\(subManager.planType.groupLabel)ダッシュボード")
+            .navigationDestination(for: FamilyMember.self) { member in
+                HistoryView(member: member)
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if isLoading {
@@ -109,7 +112,7 @@ struct DashboardView: View {
     private var memberGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
             ForEach(members) { member in
-                NavigationLink(destination: HistoryView(member: member)) {
+                NavigationLink(value: member) {
                     MemberDashboardCard(member: member, isMe: member.id == appState.myMemberId)
                 }
                 .buttonStyle(.plain)
