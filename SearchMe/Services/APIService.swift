@@ -43,6 +43,11 @@ final class APIService {
         let _: EmptyResponse = try await post(path: "/disaster/deactivate", body: body)
     }
 
+    func reportSafety(memberId: String, groupId: String, status: String) async throws {
+        let body = ["member_id": memberId, "group_id": groupId, "status": status]
+        let _: EmptyResponse = try await post(path: "/safety", body: body)
+    }
+
     func leaveGroup(memberId: String) async throws {
         guard let url = URL(string: base + "/members/\(memberId)") else { throw URLError(.badURL) }
         var req = URLRequest(url: url)

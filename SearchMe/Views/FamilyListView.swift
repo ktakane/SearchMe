@@ -75,6 +75,15 @@ struct MemberRow: View {
                     .foregroundColor(member.hasLocation ? .secondary : .red)
             }
             Spacer()
+            VStack(spacing: 4) {
+                Image(systemName: member.safetyIcon)
+                    .foregroundColor(member.safetyColor)
+                    .font(.system(size: 20))
+                Text(member.safetyLabel)
+                    .font(.caption2)
+                    .foregroundColor(member.safetyColor)
+            }
+
             if let battery = member.batteryLevel {
                 VStack(spacing: 2) {
                     Image(systemName: batteryIcon(battery))

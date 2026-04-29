@@ -34,6 +34,14 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+def migrate_db():
+    with get_db() as conn:
+        for col in ('safety_status', 'safety_updated_at'):
+            try:
+                conn.execute(f'ALTER TABLE members ADD COLUMN {col} TEXT')
+            except Exception:
+                pass
+
 def init_db():
     with get_db() as conn:
         conn.executescript('''
@@ -252,14 +260,16 @@ def get_members(group_id):
             'SELECT * FROM members WHERE group_id = ?', (group_id,)
         ).fetchall()
     members = [{
-        'id':           r['id'],
-        'groupId':      r['group_id'],
-        'name':         r['name'],
-        'latitude':     r['latitude'],
-        'longitude':    r['longitude'],
-        'batteryLevel': r['battery'],
-        'updatedAt':    r['updated_at'],
-        'isMe':         False
+        'id':              r['id'],
+        'groupId':         r['group_id'],
+        'name':            r['name'],
+        'latitude':        r['latitude'],
+        'longitude':       r['longitude'],
+        'batteryLevel':    r['battery'],
+        'updatedAt':       r['updated_at'],
+        'safetyStatus':    r['safety_status'],
+        'safetyUpdatedAt': r['safety_updated_at'],
+        'isMe':            False
     } for r in rows]
     return jsonify(members)
 
@@ -347,6 +357,44 @@ def delete_member(member_id):
     with get_db() as conn:
         conn.execute('DELETE FROM device_tokens WHERE member_id = ?', (member_id,))
         conn.execute('DELETE FROM members WHERE id = ?', (member_id,))
+    return jsonify({'ok': True})
+
+# MARK: - 安否確認
+
+@app.route('/api/safety', methods=['POST'])
+def report_safety():
+    data = request.get_json()
+    member_id = data.get('member_id', '').strip()
+    group_id  = data.get('group_id', '').strip()
+    status    = data.get('status', '').strip()
+    if not all([member_id, group_id, status]) or status not in ('safe', 'need_help'):
+        return jsonify({'error': 'invalid params'}), 400
+
+    with get_db() as conn:
+        member = conn.execute('SELECT name FROM members WHERE id = ?', (member_id,)).fetchone()
+        conn.execute(
+            'UPDATE members SET safety_status=?, safety_updated_at=? WHERE id=?',
+            (status, now_iso(), member_id)
+        )
+        tokens = conn.execute(
+            'SELECT token FROM device_tokens WHERE group_id = ? AND member_id != ?',
+            (group_id, member_id)
+        ).fetchall()
+
+    name         = member['name'] if member else '不明'
+    status_label = '無事です' if status == 'safe' else '助けが必要'
+    payload = {
+        'aps': {
+            'alert': {'title': '🔔 安否確認', 'body': f'{name}さんが「{status_label}」と報告しました'},
+            'sound': 'default'
+        },
+        'type': 'safety_report',
+        'member_id': member_id,
+        'status': status
+    }
+    for row in tokens:
+        send_apns(row['token'], payload)
+
     return jsonify({'ok': True})
 
 # MARK: - 避難所
@@ -505,6 +553,7 @@ def admin():
 # MARK: - 起動
 
 init_db()
+migrate_db()
 
 # 地震監視スレッドを起動
 earthquake_thread = threading.Thread(target=poll_earthquake, daemon=True)

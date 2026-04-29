@@ -20,6 +20,7 @@
 		99639A8E5C01FA03B7570F57 /* FamilyListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9C688F75605CA98A993970 /* FamilyListView.swift */; };
 		BF8C29BFD84EE36EEF4B6E59 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39810925E4C7D7C0C001C940 /* HomeView.swift */; };
 		CE7CEA70F1783BEA1C02D5FE /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC978088B3A72BD3F20DCB0 /* AppState.swift */; };
+		EB51F0FF47B82E2042142158 /* SafetySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F279A0CF9EBF820BBA5B18A /* SafetySheet.swift */; };
 		EC3EFB340B8273B0C0C20C05 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C4A388A32841CEAC79FBA06 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
@@ -37,6 +38,7 @@
 		56B098BA747C3C79B9F9C925 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		6C4A388A32841CEAC79FBA06 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		72A68CAC5A86AAEB814D0E5D /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
+		8F279A0CF9EBF820BBA5B18A /* SafetySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafetySheet.swift; sourceTree = "<group>"; };
 		99A25E9A3572A2DB87B2A6C1 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		D9D560994186E434CE8548BD /* SearchMe.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SearchMe.entitlements; sourceTree = "<group>"; };
 		EC09FE05787B31AF4159B4C0 /* ShelterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelterService.swift; sourceTree = "<group>"; };
@@ -52,6 +54,7 @@
 				39810925E4C7D7C0C001C940 /* HomeView.swift */,
 				ECC5F92298135FF8BE907D90 /* MainTabView.swift */,
 				089955F0EB31DC189692D042 /* MapView.swift */,
+				8F279A0CF9EBF820BBA5B18A /* SafetySheet.swift */,
 				6C4A388A32841CEAC79FBA06 /* SettingsView.swift */,
 				72A68CAC5A86AAEB814D0E5D /* SetupView.swift */,
 			);
@@ -186,6 +189,7 @@
 				89E890BAD29336E4331814CF /* MainTabView.swift in Sources */,
 				3262FC604591ECA0BFE052D9 /* MapView.swift in Sources */,
 				1A3C9F496E94823F909A8578 /* Models.swift in Sources */,
+				EB51F0FF47B82E2042142158 /* SafetySheet.swift in Sources */,
 				76B7D483A059A37780D675D7 /* SearchMeApp.swift in Sources */,
 				EC3EFB340B8273B0C0C20C05 /* SettingsView.swift in Sources */,
 				72A784818E7E6E91C57EE064 /* SetupView.swift in Sources */,

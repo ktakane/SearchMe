@@ -7,9 +7,35 @@ struct FamilyMember: Identifiable, Codable {
     var longitude: Double?
     var batteryLevel: Float?
     var updatedAt: String?
+    var safetyStatus: String?
+    var safetyUpdatedAt: String?
     var isMe: Bool
 
     var hasLocation: Bool { latitude != nil && longitude != nil }
+
+    var safetyIcon: String {
+        switch safetyStatus {
+        case "safe":      return "checkmark.circle.fill"
+        case "need_help": return "exclamationmark.circle.fill"
+        default:          return "questionmark.circle"
+        }
+    }
+
+    var safetyColor: Color {
+        switch safetyStatus {
+        case "safe":      return .green
+        case "need_help": return .red
+        default:          return .gray
+        }
+    }
+
+    var safetyLabel: String {
+        switch safetyStatus {
+        case "safe":      return "無事"
+        case "need_help": return "要救助"
+        default:          return "未確認"
+        }
+    }
 
     var updatedAtDate: Date? {
         guard let s = updatedAt else { return nil }
@@ -72,3 +98,4 @@ struct Shelter: Identifiable, Codable {
 }
 
 import CoreLocation
+import SwiftUI

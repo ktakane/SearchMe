@@ -1,9 +1,12 @@
 import SwiftUI
+import UserNotifications
 
 struct HomeView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var locationService = LocationService.shared
     @State private var showDisasterConfirm = false
+    @State private var showSafetySheet = false
+    @State private var safetySheetIsStopping = false
 
     var body: some View {
         NavigationView {
@@ -11,6 +14,7 @@ struct HomeView: View {
                 VStack(spacing: 24) {
                     statusCard
                     disasterButton
+                    if appState.isDisasterMode { safetyButton }
                     infoCard
                 }
                 .padding()
@@ -28,6 +32,14 @@ struct HomeView: View {
             Button("キャンセル", role: .cancel) {}
         } message: {
             Text("家族があなたの位置を確認できるようになります。")
+        }
+        .sheet(isPresented: $showSafetySheet) {
+            SafetySheet(
+                isPresented: $showSafetySheet,
+                isStopping: safetySheetIsStopping,
+                onCompleted: safetySheetIsStopping ? stopDisasterMode : nil
+            )
+            .environmentObject(appState)
         }
     }
 
@@ -86,11 +98,26 @@ struct HomeView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 
+    private var safetyButton: some View {
+        Button {
+            safetySheetIsStopping = false
+            showSafetySheet = true
+        } label: {
+            Label("安否を報告する", systemImage: "person.fill.checkmark")
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(.green.opacity(0.15))
+                .foregroundColor(.green)
+                .cornerRadius(12)
+        }
+    }
+
     private var disasterButton: some View {
         Group {
             if appState.isDisasterMode {
                 Button {
-                    stopDisasterMode()
+                    safetySheetIsStopping = true
+                    showSafetySheet = true
                 } label: {
                     VStack(spacing: 8) {
                         Image(systemName: "stop.circle.fill")
@@ -147,6 +174,7 @@ struct HomeView: View {
     private func startDisasterMode() {
         appState.isDisasterMode = true
         locationService.startDisasterTracking()
+        scheduleFirstSafetyReminder()
         Task {
             try? await APIService.shared.activateDisaster(groupId: appState.groupId)
         }
@@ -155,8 +183,19 @@ struct HomeView: View {
     private func stopDisasterMode() {
         appState.isDisasterMode = false
         locationService.stopDisasterTracking()
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["safety_reminder"])
         Task {
             try? await APIService.shared.deactivateDisaster(groupId: appState.groupId)
         }
+    }
+
+    private func scheduleFirstSafetyReminder() {
+        let content = UNMutableNotificationContent()
+        content.title = "安否確認をしてください"
+        content.body = "災害モード稼働中です。家族に現在の状況を知らせてください。"
+        content.sound = .default
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3600, repeats: false)
+        let request = UNNotificationRequest(identifier: "safety_reminder", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
     }
 }
