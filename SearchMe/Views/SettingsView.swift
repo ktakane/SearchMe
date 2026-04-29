@@ -3,7 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @State private var showLeaveConfirm = false
-    @State private var showDisbandConfirm = false
+    @State private var showDisbandSheet = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -46,7 +46,7 @@ struct SettingsView: View {
                 Section {
                     if appState.isOwner {
                         Button(role: .destructive) {
-                            showDisbandConfirm = true
+                            showDisbandSheet = true
                         } label: {
                             Label("グループを解散する", systemImage: "trash")
                         }
@@ -66,11 +66,15 @@ struct SettingsView: View {
             } message: {
                 Text("退出すると初期設定からやり直しになります。")
             }
-            .alert("グループを解散しますか？", isPresented: $showDisbandConfirm) {
-                Button("解散する", role: .destructive) { disband() }
-                Button("キャンセル", role: .cancel) {}
-            } message: {
-                Text("全メンバーがグループから退出されます。この操作は取り消せません。")
+            .sheet(isPresented: $showDisbandSheet) {
+                DisbandConfirmSheet(
+                    groupName: appState.groupName,
+                    onDisband: {
+                        showDisbandSheet = false
+                        disband()
+                    },
+                    onCancel: { showDisbandSheet = false }
+                )
             }
         }
     }
@@ -97,6 +101,76 @@ struct SettingsView: View {
             } catch {
                 await MainActor.run { errorMessage = "解散に失敗しました: \(error.localizedDescription)" }
             }
+        }
+    }
+}
+
+// MARK: - 解散確認シート
+
+struct DisbandConfirmSheet: View {
+    let groupName: String
+    let onDisband: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            VStack(spacing: 20) {
+                Image(systemName: "trash.circle.fill")
+                    .font(.system(size: 64))
+                    .foregroundColor(.red)
+
+                Text("「\(groupName)」を解散しますか？")
+                    .font(.title3.bold())
+                    .multilineTextAlignment(.center)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    warningRow(icon: "person.badge.minus", text: "グループの全メンバーが強制的に退出されます")
+                    warningRow(icon: "location.slash", text: "全員の位置情報・安否情報が削除されます")
+                    warningRow(icon: "arrow.uturn.backward.slash", text: "この操作は取り消すことができません")
+                    warningRow(icon: "iphone.slash", text: "家族の端末は次回起動時に初期設定画面に戻ります")
+                }
+                .padding()
+                .background(.red.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+            }
+            .padding(.horizontal, 24)
+
+            Spacer()
+
+            VStack(spacing: 12) {
+                Button(role: .destructive, action: onDisband) {
+                    Text("グループを解散する")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.red)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+
+                Button(action: onCancel) {
+                    Text("キャンセル")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 40)
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func warningRow(icon: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(.red)
+                .frame(width: 20)
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(.primary)
         }
     }
 }
