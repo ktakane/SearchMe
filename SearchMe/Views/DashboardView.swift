@@ -12,7 +12,7 @@ struct DashboardView: View {
     private var respondedCount: Int { safeCount + helpCount }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     if appState.isDisasterMode {
