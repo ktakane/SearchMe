@@ -52,6 +52,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         print("APNs registration failed: \(error)")
     }
 
+    // 通知タップ → 安否確認リマインダーならホーム画面でシートを表示
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        if response.notification.request.identifier == "safety_reminder" {
+            DispatchQueue.main.async { [weak self] in
+                self?.appState?.showSafetyReminder = true
+            }
+        }
+        completionHandler()
+    }
+
     // バックグラウンド通知受信 → 都道府県を確認してから災害モード開始
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any],

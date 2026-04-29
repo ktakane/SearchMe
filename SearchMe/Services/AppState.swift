@@ -10,6 +10,7 @@ final class AppState: ObservableObject {
     @Published var isDisasterMode: Bool = UserDefaults.standard.bool(forKey: "isDisasterMode") {
         didSet { UserDefaults.standard.set(isDisasterMode, forKey: "isDisasterMode") }
     }
+    @Published var showSafetyReminder: Bool = false
 
     var isSetupComplete: Bool { !myMemberId.isEmpty && !groupId.isEmpty }
 
