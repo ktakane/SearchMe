@@ -118,7 +118,8 @@ def send_apns(device_token: str, payload: dict):
         print(f'[APNs] 送信エラー: {e}')
         return False
 
-def notify_all_disaster(reason: str):
+def notify_all_disaster(reason: str, affected_areas: list):
+    # affected_areas が空の場合は全員に送信（初期速報など地域データ未確定時）
     payload = {
         'aps': {
             'content-available': 1,
@@ -126,7 +127,8 @@ def notify_all_disaster(reason: str):
             'alert': {'title': '⚠️ 災害検知', 'body': reason}
         },
         'type': 'disaster_alert',
-        'reason': reason
+        'reason': reason,
+        'affected_areas': affected_areas
     }
     with get_db() as conn:
         tokens = conn.execute('SELECT token FROM device_tokens').fetchall()
@@ -158,9 +160,14 @@ def poll_earthquake():
                             'INSERT INTO sent_earthquakes (event_id, sent_at) VALUES (?, ?)',
                             (event_id, now_iso())
                         )
-                        title = q.get('en_title', '地震')
+                        title = q.get('en_anm', q.get('anm', '地震'))
                         reason = f'震度{intensity}の地震が発生しました（{title}）'
-                        threading.Thread(target=notify_all_disaster, args=(reason,), daemon=True).start()
+                        affected_areas = [
+                            {'code': area['code'], 'maxi': area['maxi']}
+                            for area in q.get('int', [])
+                            if area.get('maxi') in TRIGGER_INTENSITY
+                        ]
+                        threading.Thread(target=notify_all_disaster, args=(reason, affected_areas), daemon=True).start()
         except Exception as e:
             print(f'[地震監視] エラー: {e}')
         time.sleep(60)
