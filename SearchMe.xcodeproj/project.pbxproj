@@ -10,6 +10,7 @@
 		1A3C9F496E94823F909A8578 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56B098BA747C3C79B9F9C925 /* Models.swift */; };
 		22EF85DD5A07FB5216C6DF87 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B20DC50F0B291A6ADE1376B /* APIService.swift */; };
 		3262FC604591ECA0BFE052D9 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089955F0EB31DC189692D042 /* MapView.swift */; };
+		37740FED970E1CAC98632168 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F043113ECA9E8FE3494439 /* HistoryView.swift */; };
 		46063B57683BFA900B85D805 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9390F3F025D898B29F23CB /* SubscriptionManager.swift */; };
 		51E7FCE2A90CF25D5BDB935B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22344778D239AE1731AABEEB /* ContentView.swift */; };
 		57E16733309CF3B33DB31F23 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 007F221747321D1A0EC69127 /* PaywallView.swift */; };
@@ -49,6 +50,7 @@
 		D9D560994186E434CE8548BD /* SearchMe.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SearchMe.entitlements; sourceTree = "<group>"; };
 		EC09FE05787B31AF4159B4C0 /* ShelterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelterService.swift; sourceTree = "<group>"; };
 		ECC5F92298135FF8BE907D90 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		F7F043113ECA9E8FE3494439 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -58,6 +60,7 @@
 				22344778D239AE1731AABEEB /* ContentView.swift */,
 				5068741F159294FF9B469FD1 /* DashboardView.swift */,
 				3C9C688F75605CA98A993970 /* FamilyListView.swift */,
+				F7F043113ECA9E8FE3494439 /* HistoryView.swift */,
 				39810925E4C7D7C0C001C940 /* HomeView.swift */,
 				ECC5F92298135FF8BE907D90 /* MainTabView.swift */,
 				089955F0EB31DC189692D042 /* MapView.swift */,
@@ -194,6 +197,7 @@
 				51E7FCE2A90CF25D5BDB935B /* ContentView.swift in Sources */,
 				A36F7BAACBB417F09D9F1C96 /* DashboardView.swift in Sources */,
 				99639A8E5C01FA03B7570F57 /* FamilyListView.swift in Sources */,
+				37740FED970E1CAC98632168 /* HistoryView.swift in Sources */,
 				BF8C29BFD84EE36EEF4B6E59 /* HomeView.swift in Sources */,
 				7486B753304DA7AEC744EC41 /* LocationService.swift in Sources */,
 				89E890BAD29336E4331814CF /* MainTabView.swift in Sources */,

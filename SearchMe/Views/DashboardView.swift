@@ -108,7 +108,10 @@ struct DashboardView: View {
     private var memberGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
             ForEach(members) { member in
-                MemberDashboardCard(member: member, isMe: member.id == appState.myMemberId)
+                NavigationLink(destination: HistoryView(member: member)) {
+                    MemberDashboardCard(member: member, isMe: member.id == appState.myMemberId)
+                }
+                .buttonStyle(.plain)
             }
         }
     }

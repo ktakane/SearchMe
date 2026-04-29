@@ -97,5 +97,29 @@ struct Shelter: Identifiable, Codable {
     }
 }
 
+struct HistoryPoint: Identifiable, Codable {
+    var id: Int
+    var latitude: Double
+    var longitude: Double
+    var battery: Float?
+    var recordedAt: String
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    var recordedAtDate: Date? {
+        ISO8601DateFormatter().date(from: recordedAt)
+    }
+
+    var timeDisplay: String {
+        guard let date = recordedAtDate else { return "---" }
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd HH:mm"
+        f.locale = Locale(identifier: "ja_JP")
+        return f.string(from: date)
+    }
+}
+
 import CoreLocation
 import SwiftUI

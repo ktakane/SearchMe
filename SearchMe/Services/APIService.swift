@@ -27,6 +27,10 @@ final class APIService {
         return (resp.group, resp.member)
     }
 
+    func fetchHistory(memberId: String, hours: Int) async throws -> [HistoryPoint] {
+        return try await get(path: "/members/\(memberId)/history?hours=\(hours)")
+    }
+
     func updateGroupPlan(groupId: String, maxMembers: Int) async throws {
         struct Body: Encodable { var max_members: Int }
         let _: EmptyResponse = try await put(path: "/groups/\(groupId)/plan", body: Body(max_members: maxMembers))

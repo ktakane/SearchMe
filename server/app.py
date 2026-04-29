@@ -46,6 +46,19 @@ def migrate_db():
             conn.execute('ALTER TABLE groups ADD COLUMN max_members INTEGER NOT NULL DEFAULT 2')
         except Exception:
             pass
+        conn.executescript('''
+            CREATE TABLE IF NOT EXISTS location_history (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                member_id   TEXT NOT NULL,
+                group_id    TEXT NOT NULL,
+                latitude    REAL NOT NULL,
+                longitude   REAL NOT NULL,
+                battery     REAL,
+                recorded_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_history_member
+                ON location_history (member_id, recorded_at);
+        ''')
 
 def init_db():
     with get_db() as conn:
@@ -107,6 +120,17 @@ def init_db():
                 key   TEXT PRIMARY KEY,
                 value TEXT
             );
+            CREATE TABLE IF NOT EXISTS location_history (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                member_id   TEXT NOT NULL,
+                group_id    TEXT NOT NULL,
+                latitude    REAL NOT NULL,
+                longitude   REAL NOT NULL,
+                battery     REAL,
+                recorded_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_history_member
+                ON location_history (member_id, recorded_at);
         ''')
 
 def generate_invite_code():
@@ -347,6 +371,10 @@ def update_location():
             'UPDATE members SET latitude=?, longitude=?, battery=?, updated_at=? WHERE id=?',
             (latitude, longitude, battery, timestamp, member_id)
         )
+        conn.execute(
+            'INSERT INTO location_history (member_id, group_id, latitude, longitude, battery, recorded_at) VALUES (?, ?, ?, ?, ?, ?)',
+            (member_id, group_id, latitude, longitude, battery, timestamp)
+        )
 
         # バッテリー低下アラート（災害モード中のみ）
         if battery is not None and battery >= 0:
@@ -421,8 +449,36 @@ def deactivate_disaster():
 def delete_member(member_id):
     with get_db() as conn:
         conn.execute('DELETE FROM device_tokens WHERE member_id = ?', (member_id,))
+        conn.execute('DELETE FROM location_history WHERE member_id = ?', (member_id,))
         conn.execute('DELETE FROM members WHERE id = ?', (member_id,))
     return jsonify({'ok': True})
+
+# MARK: - 移動履歴
+
+@app.route('/api/members/<member_id>/history', methods=['GET'])
+def get_member_history(member_id):
+    hours = min(int(request.args.get('hours', 24)), 168)  # 最大7日
+    since = (datetime.now(JST) - timedelta(hours=hours)).isoformat()
+    with get_db() as conn:
+        rows = conn.execute(
+            '''SELECT id, latitude, longitude, battery, recorded_at
+               FROM location_history
+               WHERE member_id = ? AND recorded_at >= ?
+               ORDER BY recorded_at ASC''',
+            (member_id, since)
+        ).fetchall()
+    return jsonify([{
+        'id':         r['id'],
+        'latitude':   r['latitude'],
+        'longitude':  r['longitude'],
+        'battery':    r['battery'],
+        'recordedAt': r['recorded_at']
+    } for r in rows])
+
+def cleanup_old_history():
+    cutoff = (datetime.now(JST) - timedelta(days=7)).isoformat()
+    with get_db() as conn:
+        conn.execute('DELETE FROM location_history WHERE recorded_at < ?', (cutoff,))
 
 # MARK: - 安否確認
 
@@ -619,6 +675,7 @@ def admin():
 
 init_db()
 migrate_db()
+cleanup_old_history()
 
 # 地震監視スレッドを起動
 earthquake_thread = threading.Thread(target=poll_earthquake, daemon=True)
