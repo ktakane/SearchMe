@@ -7,7 +7,9 @@ final class AppState: ObservableObject {
     @Published var groupId: String    = UserDefaults.standard.string(forKey: "groupId") ?? ""
     @Published var groupName: String  = UserDefaults.standard.string(forKey: "groupName") ?? ""
     @Published var inviteCode: String = UserDefaults.standard.string(forKey: "inviteCode") ?? ""
-    @Published var isDisasterMode: Bool = false
+    @Published var isDisasterMode: Bool = UserDefaults.standard.bool(forKey: "isDisasterMode") {
+        didSet { UserDefaults.standard.set(isDisasterMode, forKey: "isDisasterMode") }
+    }
 
     var isSetupComplete: Bool { !myMemberId.isEmpty && !groupId.isEmpty }
 
