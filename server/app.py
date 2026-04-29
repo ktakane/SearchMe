@@ -72,6 +72,27 @@ def init_db():
                 event_id   TEXT PRIMARY KEY,
                 sent_at    TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS shelters (
+                id           INTEGER PRIMARY KEY,
+                name         TEXT NOT NULL,
+                address      TEXT,
+                latitude     REAL NOT NULL,
+                longitude    REAL NOT NULL,
+                flood        INTEGER DEFAULT 0,
+                landslide    INTEGER DEFAULT 0,
+                storm_surge  INTEGER DEFAULT 0,
+                earthquake   INTEGER DEFAULT 0,
+                tsunami      INTEGER DEFAULT 0,
+                fire         INTEGER DEFAULT 0,
+                inland_flood INTEGER DEFAULT 0,
+                volcano      INTEGER DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_shelters_lat ON shelters (latitude);
+            CREATE INDEX IF NOT EXISTS idx_shelters_lng ON shelters (longitude);
+            CREATE TABLE IF NOT EXISTS shelter_meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            );
         ''')
 
 def generate_invite_code():
@@ -327,6 +348,67 @@ def delete_member(member_id):
         conn.execute('DELETE FROM device_tokens WHERE member_id = ?', (member_id,))
         conn.execute('DELETE FROM members WHERE id = ?', (member_id,))
     return jsonify({'ok': True})
+
+# MARK: - 避難所
+
+@app.route('/api/shelters/version', methods=['GET'])
+def shelter_version():
+    with get_db() as conn:
+        row = conn.execute("SELECT value FROM shelter_meta WHERE key='version'").fetchone()
+    return jsonify({'version': row['value'] if row else None})
+
+@app.route('/api/shelters/download', methods=['GET'])
+def shelter_download():
+    import gzip
+    with get_db() as conn:
+        rows = conn.execute('SELECT * FROM shelters').fetchall()
+    shelters = [{
+        'id':          r['id'],
+        'name':        r['name'],
+        'address':     r['address'],
+        'lat':         r['latitude'],
+        'lng':         r['longitude'],
+        'flood':       r['flood'],
+        'landslide':   r['landslide'],
+        'stormSurge':  r['storm_surge'],
+        'earthquake':  r['earthquake'],
+        'tsunami':     r['tsunami'],
+        'fire':        r['fire'],
+        'inlandFlood': r['inland_flood'],
+        'volcano':     r['volcano'],
+    } for r in rows]
+    body = json.dumps(shelters, ensure_ascii=False).encode('utf-8')
+    compressed = gzip.compress(body)
+    from flask import Response
+    return Response(
+        compressed,
+        mimetype='application/json',
+        headers={'Content-Encoding': 'gzip', 'Content-Length': len(compressed)}
+    )
+
+@app.route('/api/shelters/nearby', methods=['GET'])
+def shelters_nearby():
+    try:
+        lat    = float(request.args.get('lat'))
+        lng    = float(request.args.get('lng'))
+        radius = float(request.args.get('radius', 3000))  # メートル
+    except (TypeError, ValueError):
+        return jsonify({'error': 'invalid params'}), 400
+
+    # 1度≒111km で簡易バウンディングボックス
+    delta_lat = radius / 111000
+    delta_lng = radius / (111000 * abs(__import__('math').cos(__import__('math').radians(lat))))
+    with get_db() as conn:
+        rows = conn.execute('''
+            SELECT * FROM shelters
+            WHERE latitude  BETWEEN ? AND ?
+              AND longitude BETWEEN ? AND ?
+        ''', (lat - delta_lat, lat + delta_lat, lng - delta_lng, lng + delta_lng)).fetchall()
+    return jsonify([{
+        'id': r['id'], 'name': r['name'], 'address': r['address'],
+        'lat': r['latitude'], 'lng': r['longitude'],
+        'earthquake': r['earthquake'], 'tsunami': r['tsunami'], 'flood': r['flood']
+    } for r in rows])
 
 # MARK: - 管理画面
 

@@ -47,3 +47,28 @@ struct DisasterEvent: Codable {
     var detectedAt: String
     var isActive: Bool
 }
+
+struct Shelter: Identifiable, Codable {
+    var id: Int
+    var name: String
+    var address: String?
+    var lat: Double
+    var lng: Double
+    var earthquake: Int
+    var tsunami: Int
+    var flood: Int
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: lat, longitude: lng)
+    }
+
+    var disasterTypes: String {
+        var types: [String] = []
+        if earthquake == 1 { types.append("地震") }
+        if tsunami    == 1 { types.append("津波") }
+        if flood      == 1 { types.append("洪水") }
+        return types.isEmpty ? "多目的" : types.joined(separator: "・")
+    }
+}
+
+import CoreLocation
