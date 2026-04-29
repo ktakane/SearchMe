@@ -1,0 +1,414 @@
+from flask import Flask, request, jsonify, render_template_string
+from flask_cors import CORS
+import sqlite3
+import random
+import string
+import os
+import threading
+import time
+import json
+import jwt
+import httpx
+import requests
+from datetime import datetime, timedelta, timezone
+
+app = Flask(__name__)
+CORS(app)
+
+DB_PATH = os.path.join(os.path.dirname(__file__), 'searchme.db')
+JST = timezone(timedelta(hours=9))
+
+# APNs設定（環境変数から読み込み）
+APNS_KEY_PATH  = os.environ.get('APNS_KEY_PATH', '/home/skyscanning/searchme_server/apns_key.p8')
+APNS_KEY_ID    = os.environ.get('APNS_KEY_ID', '')
+APNS_TEAM_ID   = os.environ.get('APNS_TEAM_ID', '5N3593DK92')
+APNS_BUNDLE_ID = 'com.skyscanning.searchme'
+APNS_HOST      = 'https://api.sandbox.push.apple.com'  # 本番: api.push.apple.com
+
+# 気象庁API
+JMA_URL = 'https://www.jma.go.jp/bosai/quake/data/list.json'
+TRIGGER_INTENSITY = ['5-', '5+', '6-', '6+', '7']
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    with get_db() as conn:
+        conn.executescript('''
+            CREATE TABLE IF NOT EXISTS groups (
+                id          TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                invite_code TEXT UNIQUE NOT NULL,
+                created_at  TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS members (
+                id          TEXT PRIMARY KEY,
+                group_id    TEXT NOT NULL,
+                name        TEXT NOT NULL,
+                latitude    REAL,
+                longitude   REAL,
+                battery     REAL,
+                updated_at  TEXT,
+                FOREIGN KEY (group_id) REFERENCES groups(id)
+            );
+            CREATE TABLE IF NOT EXISTS device_tokens (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                member_id  TEXT NOT NULL,
+                group_id   TEXT NOT NULL,
+                token      TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(member_id)
+            );
+            CREATE TABLE IF NOT EXISTS disaster_events (
+                id             TEXT PRIMARY KEY,
+                group_id       TEXT NOT NULL,
+                activated_at   TEXT NOT NULL,
+                deactivated_at TEXT,
+                is_active      INTEGER DEFAULT 1
+            );
+            CREATE TABLE IF NOT EXISTS sent_earthquakes (
+                event_id   TEXT PRIMARY KEY,
+                sent_at    TEXT NOT NULL
+            );
+        ''')
+
+def generate_invite_code():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+def generate_id():
+    import uuid
+    return str(uuid.uuid4())
+
+def now_iso():
+    return datetime.now(JST).isoformat()
+
+# MARK: - APNs送信
+
+def send_apns(device_token: str, payload: dict):
+    try:
+        if not os.path.exists(APNS_KEY_PATH) or not APNS_KEY_ID:
+            print('[APNs] キーファイルまたはKey IDが未設定')
+            return False
+
+        with open(APNS_KEY_PATH, 'r') as f:
+            private_key = f.read()
+
+        token = jwt.encode(
+            {'iss': APNS_TEAM_ID, 'iat': time.time()},
+            private_key,
+            algorithm='ES256',
+            headers={'kid': APNS_KEY_ID}
+        )
+
+        headers = {
+            'authorization': f'bearer {token}',
+            'apns-topic': APNS_BUNDLE_ID,
+            'apns-push-type': 'background',
+            'apns-priority': '5',
+        }
+
+        url = f'{APNS_HOST}/3/device/{device_token}'
+        with httpx.Client(http2=True) as client:
+            resp = client.post(url, json=payload, headers=headers, timeout=10)
+            return resp.status_code == 200
+
+    except Exception as e:
+        print(f'[APNs] 送信エラー: {e}')
+        return False
+
+def notify_all_disaster(reason: str):
+    payload = {
+        'aps': {
+            'content-available': 1,
+            'sound': 'default',
+            'alert': {'title': '⚠️ 災害検知', 'body': reason}
+        },
+        'type': 'disaster_alert',
+        'reason': reason
+    }
+    with get_db() as conn:
+        tokens = conn.execute('SELECT token FROM device_tokens').fetchall()
+    for row in tokens:
+        send_apns(row['token'], payload)
+    print(f'[通知] {len(tokens)}件送信: {reason}')
+
+# MARK: - 気象庁APIポーリング
+
+def poll_earthquake():
+    print('[地震監視] 開始')
+    while True:
+        try:
+            resp = requests.get(JMA_URL, timeout=10)
+            if resp.status_code == 200:
+                quakes = resp.json()
+                with get_db() as conn:
+                    for q in quakes[:10]:
+                        event_id = q.get('id', '')
+                        intensity = q.get('maxi', '')
+                        if not event_id or intensity not in TRIGGER_INTENSITY:
+                            continue
+                        already_sent = conn.execute(
+                            'SELECT 1 FROM sent_earthquakes WHERE event_id = ?', (event_id,)
+                        ).fetchone()
+                        if already_sent:
+                            continue
+                        conn.execute(
+                            'INSERT INTO sent_earthquakes (event_id, sent_at) VALUES (?, ?)',
+                            (event_id, now_iso())
+                        )
+                        title = q.get('en_title', '地震')
+                        reason = f'震度{intensity}の地震が発生しました（{title}）'
+                        threading.Thread(target=notify_all_disaster, args=(reason,), daemon=True).start()
+        except Exception as e:
+            print(f'[地震監視] エラー: {e}')
+        time.sleep(60)
+
+# MARK: - グループ
+
+@app.route('/api/groups', methods=['POST'])
+def create_group():
+    data = request.get_json()
+    name        = data.get('name', '').strip()
+    owner_name  = data.get('owner_name', '').strip()
+    if not name or not owner_name:
+        return jsonify({'error': 'name and owner_name are required'}), 400
+
+    group_id    = generate_id()
+    member_id   = generate_id()
+    invite_code = generate_invite_code()
+    with get_db() as conn:
+        conn.execute(
+            'INSERT INTO groups (id, name, invite_code, created_at) VALUES (?, ?, ?, ?)',
+            (group_id, name, invite_code, now_iso())
+        )
+        conn.execute(
+            'INSERT INTO members (id, group_id, name) VALUES (?, ?, ?)',
+            (member_id, group_id, owner_name)
+        )
+    return jsonify({
+        'group':  {'id': group_id, 'name': name, 'inviteCode': invite_code},
+        'member': {'id': member_id, 'groupId': group_id, 'name': owner_name, 'isMe': True}
+    })
+
+@app.route('/api/groups/join', methods=['POST'])
+def join_group():
+    data = request.get_json()
+    invite_code = data.get('invite_code', '').strip().upper()
+    member_name = data.get('name', '').strip()
+    if not invite_code or not member_name:
+        return jsonify({'error': 'invite_code and name are required'}), 400
+
+    with get_db() as conn:
+        group = conn.execute(
+            'SELECT * FROM groups WHERE invite_code = ?', (invite_code,)
+        ).fetchone()
+        if not group:
+            return jsonify({'error': 'invalid invite code'}), 404
+
+        member_id = generate_id()
+        conn.execute(
+            'INSERT INTO members (id, group_id, name) VALUES (?, ?, ?)',
+            (member_id, group['id'], member_name)
+        )
+    return jsonify({
+        'group':  {'id': group['id'], 'name': group['name'], 'inviteCode': group['invite_code']},
+        'member': {'id': member_id, 'groupId': group['id'], 'name': member_name, 'isMe': True}
+    })
+
+@app.route('/api/groups/<group_id>/members', methods=['GET'])
+def get_members(group_id):
+    with get_db() as conn:
+        rows = conn.execute(
+            'SELECT * FROM members WHERE group_id = ?', (group_id,)
+        ).fetchall()
+    members = [{
+        'id':           r['id'],
+        'groupId':      r['group_id'],
+        'name':         r['name'],
+        'latitude':     r['latitude'],
+        'longitude':    r['longitude'],
+        'batteryLevel': r['battery'],
+        'updatedAt':    r['updated_at'],
+        'isMe':         False
+    } for r in rows]
+    return jsonify(members)
+
+# MARK: - デバイストークン
+
+@app.route('/api/register-token', methods=['POST'])
+def register_token():
+    data = request.get_json()
+    token     = data.get('token', '').strip()
+    member_id = data.get('member_id', '').strip()
+    group_id  = data.get('group_id', '').strip()
+    if not all([token, member_id, group_id]):
+        return jsonify({'error': 'missing fields'}), 400
+
+    with get_db() as conn:
+        conn.execute('''
+            INSERT INTO device_tokens (member_id, group_id, token, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(member_id) DO UPDATE SET token = excluded.token, updated_at = excluded.updated_at
+        ''', (member_id, group_id, token, now_iso()))
+    return jsonify({'ok': True})
+
+# MARK: - 位置情報
+
+@app.route('/api/location', methods=['POST'])
+def update_location():
+    data      = request.get_json()
+    member_id = data.get('memberId')
+    group_id  = data.get('groupId')
+    latitude  = data.get('latitude')
+    longitude = data.get('longitude')
+    battery   = data.get('batteryLevel')
+    timestamp = data.get('timestamp', now_iso())
+
+    if not all([member_id, group_id, latitude, longitude]):
+        return jsonify({'error': 'missing fields'}), 400
+
+    with get_db() as conn:
+        existing = conn.execute(
+            'SELECT id FROM members WHERE id = ? AND group_id = ?', (member_id, group_id)
+        ).fetchone()
+        if not existing:
+            return jsonify({'error': 'member not found'}), 404
+        conn.execute(
+            'UPDATE members SET latitude=?, longitude=?, battery=?, updated_at=? WHERE id=?',
+            (latitude, longitude, battery, timestamp, member_id)
+        )
+    return jsonify({'ok': True})
+
+# MARK: - 災害モード
+
+@app.route('/api/disaster/activate', methods=['POST'])
+def activate_disaster():
+    data = request.get_json()
+    group_id = data.get('group_id')
+    if not group_id:
+        return jsonify({'error': 'group_id is required'}), 400
+    event_id = generate_id()
+    with get_db() as conn:
+        conn.execute(
+            'INSERT INTO disaster_events (id, group_id, activated_at) VALUES (?, ?, ?)',
+            (event_id, group_id, now_iso())
+        )
+    return jsonify({'ok': True})
+
+@app.route('/api/disaster/deactivate', methods=['POST'])
+def deactivate_disaster():
+    data = request.get_json()
+    group_id = data.get('group_id')
+    if not group_id:
+        return jsonify({'error': 'group_id is required'}), 400
+    with get_db() as conn:
+        conn.execute(
+            'UPDATE disaster_events SET is_active=0, deactivated_at=? WHERE group_id=? AND is_active=1',
+            (now_iso(), group_id)
+        )
+    return jsonify({'ok': True})
+
+# MARK: - 管理画面
+
+ADMIN_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SearchMe 管理画面</title>
+<style>
+  body { font-family: sans-serif; max-width: 960px; margin: 40px auto; padding: 0 16px; }
+  h1 { color: #f97316; }
+  h2 { margin-top: 32px; border-bottom: 2px solid #f97316; padding-bottom: 4px; }
+  h3 { margin-top: 20px; color: #555; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; font-size: 13px; }
+  th { background: #f5f5f5; }
+  .no-location { color: #999; }
+  .has-location { color: #16a34a; }
+</style>
+</head>
+<body>
+<h1>SearchMe 管理画面</h1>
+
+<h2>グループ別メンバー一覧（{{ groups|length }}グループ / {{ total_members }}名）</h2>
+{% for g in groups %}
+<h3>{{ g.name }}　<small style="color:#999">招待コード: {{ g.invite_code }} ／ {{ g.member_count }}名</small></h3>
+<table>
+  <tr><th>名前</th><th>位置情報</th><th>緯度</th><th>経度</th><th>バッテリー</th><th>最終更新</th></tr>
+  {% for m in g.members %}
+  <tr>
+    <td>{{ m.name }}</td>
+    <td class="{{ 'has-location' if m.latitude else 'no-location' }}">{{ '取得済み' if m.latitude else '未取得' }}</td>
+    <td>{{ '%.4f'|format(m.latitude) if m.latitude else '-' }}</td>
+    <td>{{ '%.4f'|format(m.longitude) if m.longitude else '-' }}</td>
+    <td>{{ (m.battery * 100)|int if m.battery else '-' }}%</td>
+    <td>{{ m.updated_at or '未取得' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endfor %}
+
+<h2>デバイストークン（{{ tokens|length }}件）</h2>
+<table>
+  <tr><th>名前</th><th>グループ</th><th>トークン（先頭20文字）</th><th>更新日時</th></tr>
+  {% for t in tokens %}
+  <tr>
+    <td>{{ t.member_name or '-' }}</td>
+    <td>{{ t.group_name or '-' }}</td>
+    <td>{{ t.token[:20] }}...</td>
+    <td>{{ t.updated_at }}</td>
+  </tr>
+  {% endfor %}
+</table>
+</body>
+</html>
+'''
+
+@app.route('/admin')
+def admin():
+    with get_db() as conn:
+        group_rows  = conn.execute('SELECT * FROM groups ORDER BY created_at DESC').fetchall()
+        member_rows = conn.execute('SELECT * FROM members ORDER BY name').fetchall()
+        token_rows  = conn.execute('''
+            SELECT dt.*, m.name AS member_name, g.name AS group_name
+            FROM device_tokens dt
+            LEFT JOIN members m ON dt.member_id = m.id
+            LEFT JOIN groups g ON dt.group_id = g.id
+            ORDER BY dt.updated_at DESC
+        ''').fetchall()
+
+    members_by_group = {}
+    for m in member_rows:
+        members_by_group.setdefault(m['group_id'], []).append(m)
+
+    groups = []
+    for g in group_rows:
+        grp_members = members_by_group.get(g['id'], [])
+        groups.append({
+            'name': g['name'],
+            'invite_code': g['invite_code'],
+            'member_count': len(grp_members),
+            'members': grp_members
+        })
+
+    return render_template_string(
+        ADMIN_TEMPLATE,
+        groups=groups,
+        total_members=len(member_rows),
+        tokens=token_rows
+    )
+
+# MARK: - 起動
+
+init_db()
+
+# 地震監視スレッドを起動
+earthquake_thread = threading.Thread(target=poll_earthquake, daemon=True)
+earthquake_thread.start()
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5004, debug=False)

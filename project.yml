@@ -1,0 +1,47 @@
+name: SearchMe
+options:
+  bundleIdPrefix: com.skyscanning
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "16.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: 5N3593DK92
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  SearchMe:
+    type: application
+    platform: iOS
+    sources:
+      - SearchMe
+    info:
+      path: SearchMe/Info.plist
+      properties:
+        CFBundleDisplayName: SearchMe
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchStoryboardName: LaunchScreen
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSLocationAlwaysAndWhenInUseUsageDescription: "災害発生時に家族があなたの位置を確認できるようにするため、位置情報へのアクセスが必要です。"
+        NSLocationAlwaysUsageDescription: "災害発生時にバックグラウンドで位置情報を送信するため、「常に許可」が必要です。"
+        NSLocationWhenInUseUsageDescription: "家族の位置を地図に表示するため、位置情報へのアクセスが必要です。"
+        UIBackgroundModes:
+          - location
+          - fetch
+          - remote-notification
+        INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
+    entitlements:
+      path: SearchMe/SearchMe.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.skyscanning.searchme
+        aps-environment: development
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.skyscanning.searchme
+        INFOPLIST_FILE: SearchMe/Info.plist
