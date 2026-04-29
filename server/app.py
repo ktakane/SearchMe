@@ -23,7 +23,7 @@ APNS_KEY_PATH  = os.environ.get('APNS_KEY_PATH', '/home/skyscanning/searchme_ser
 APNS_KEY_ID    = os.environ.get('APNS_KEY_ID', '')
 APNS_TEAM_ID   = os.environ.get('APNS_TEAM_ID', '5N3593DK92')
 APNS_BUNDLE_ID = 'com.skyscanning.searchme'
-APNS_HOST      = 'https://api.sandbox.push.apple.com'  # 本番: api.push.apple.com
+APNS_HOST      = 'https://api.push.apple.com'
 
 # 気象庁API
 JMA_URL = 'https://www.jma.go.jp/bosai/quake/data/list.json'

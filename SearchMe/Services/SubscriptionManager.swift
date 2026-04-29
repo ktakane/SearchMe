@@ -66,7 +66,7 @@ final class SubscriptionManager: ObservableObject {
     private var transactionListener: Task<Void, Never>?
 
     #if DEBUG
-    static let debugForceSubscribed = true
+    static let debugForceSubscribed = false
     #endif
 
     init() {
