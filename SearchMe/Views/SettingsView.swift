@@ -2,7 +2,9 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var showResetConfirm = false
+    @State private var showLeaveConfirm = false
+    @State private var showDisbandConfirm = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationView {
@@ -11,6 +13,11 @@ struct SettingsView: View {
                     LabeledContent("名前", value: appState.myName)
                     LabeledContent("グループ", value: appState.groupName)
                     LabeledContent("招待コード", value: appState.inviteCode)
+                    if appState.isOwner {
+                        Label("オーナー", systemImage: "crown.fill")
+                            .foregroundColor(.orange)
+                            .font(.caption)
+                    }
                 }
 
                 Section("招待コードを共有") {
@@ -30,36 +37,66 @@ struct SettingsView: View {
                     }
                 }
 
+                if let error = errorMessage {
+                    Section {
+                        Text(error).foregroundColor(.red).font(.caption)
+                    }
+                }
+
                 Section {
-                    Button(role: .destructive) {
-                        showResetConfirm = true
-                    } label: {
-                        Label("グループから退出", systemImage: "person.badge.minus")
+                    if appState.isOwner {
+                        Button(role: .destructive) {
+                            showDisbandConfirm = true
+                        } label: {
+                            Label("グループを解散する", systemImage: "trash")
+                        }
+                    } else {
+                        Button(role: .destructive) {
+                            showLeaveConfirm = true
+                        } label: {
+                            Label("グループから退出", systemImage: "person.badge.minus")
+                        }
                     }
                 }
             }
             .navigationTitle("設定")
-            .alert("グループから退出しますか？", isPresented: $showResetConfirm) {
-                Button("退出", role: .destructive) { reset() }
+            .alert("グループから退出しますか？", isPresented: $showLeaveConfirm) {
+                Button("退出", role: .destructive) { leave() }
                 Button("キャンセル", role: .cancel) {}
             } message: {
                 Text("退出すると初期設定からやり直しになります。")
             }
+            .alert("グループを解散しますか？", isPresented: $showDisbandConfirm) {
+                Button("解散する", role: .destructive) { disband() }
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text("全メンバーがグループから退出されます。この操作は取り消せません。")
+            }
         }
     }
 
-    private func reset() {
+    private func leave() {
         let memberId = appState.myMemberId
-        Task { try? await APIService.shared.leaveGroup(memberId: memberId) }
-        UserDefaults.standard.removeObject(forKey: "myMemberId")
-        UserDefaults.standard.removeObject(forKey: "myName")
-        UserDefaults.standard.removeObject(forKey: "groupId")
-        UserDefaults.standard.removeObject(forKey: "groupName")
-        UserDefaults.standard.removeObject(forKey: "inviteCode")
-        appState.myMemberId = ""
-        appState.myName     = ""
-        appState.groupId    = ""
-        appState.groupName  = ""
-        appState.inviteCode = ""
+        Task {
+            do {
+                try await APIService.shared.leaveGroup(memberId: memberId)
+                await MainActor.run { appState.clearGroup() }
+            } catch {
+                await MainActor.run { errorMessage = error.localizedDescription }
+            }
+        }
+    }
+
+    private func disband() {
+        let groupId  = appState.groupId
+        let memberId = appState.myMemberId
+        Task {
+            do {
+                try await APIService.shared.deleteGroup(groupId: groupId, memberId: memberId)
+                await MainActor.run { appState.clearGroup() }
+            } catch {
+                await MainActor.run { errorMessage = "解散に失敗しました: \(error.localizedDescription)" }
+            }
+        }
     }
 }

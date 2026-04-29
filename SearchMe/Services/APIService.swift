@@ -2,12 +2,15 @@ import Foundation
 
 enum APIError: LocalizedError {
     case groupFull(max: Int)
+    case ownerCannotLeave
     case serverError(Int)
 
     var errorDescription: String? {
         switch self {
         case .groupFull(let max):
             return "グループの人数上限（\(max)名）に達しています"
+        case .ownerCannotLeave:
+            return "オーナーはグループから退出できません。グループを解散してください。"
         case .serverError(let code):
             return "サーバーエラー (\(code))"
         }
@@ -20,11 +23,11 @@ final class APIService {
 
     private init() {}
 
-    func createGroup(name: String, ownerName: String, maxMembers: Int) async throws -> (FamilyGroup, FamilyMember) {
+    func createGroup(name: String, ownerName: String, maxMembers: Int) async throws -> (FamilyGroup, FamilyMember, Bool) {
         struct Body: Encodable { var name: String; var owner_name: String; var max_members: Int }
-        struct Response: Codable { var group: FamilyGroup; var member: FamilyMember }
+        struct Response: Codable { var group: FamilyGroup; var member: FamilyMember; var isOwner: Bool }
         let resp: Response = try await post(path: "/groups", body: Body(name: name, owner_name: ownerName, max_members: maxMembers))
-        return (resp.group, resp.member)
+        return (resp.group, resp.member, resp.isOwner)
     }
 
     func fetchHistory(memberId: String, hours: Int) async throws -> [HistoryPoint] {
@@ -36,11 +39,11 @@ final class APIService {
         let _: EmptyResponse = try await put(path: "/groups/\(groupId)/plan", body: Body(max_members: maxMembers))
     }
 
-    func joinGroup(inviteCode: String, name: String) async throws -> (FamilyGroup, FamilyMember) {
-        struct JoinResponse: Codable { var group: FamilyGroup; var member: FamilyMember }
+    func joinGroup(inviteCode: String, name: String) async throws -> (FamilyGroup, FamilyMember, Bool) {
+        struct JoinResponse: Codable { var group: FamilyGroup; var member: FamilyMember; var isOwner: Bool }
         let body = ["invite_code": inviteCode, "name": name]
         let resp: JoinResponse = try await post(path: "/groups/join", body: body)
-        return (resp.group, resp.member)
+        return (resp.group, resp.member, resp.isOwner)
     }
 
     func registerToken(token: String, memberId: String, groupId: String) async throws {
@@ -75,8 +78,20 @@ final class APIService {
         guard let url = URL(string: base + "/members/\(memberId)") else { throw URLError(.badURL) }
         var req = URLRequest(url: url)
         req.httpMethod = "DELETE"
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode == 403 {
+            throw APIError.ownerCannotLeave
+        }
         let _ = try JSONDecoder().decode(EmptyResponse.self, from: data)
+    }
+
+    func deleteGroup(groupId: String, memberId: String) async throws {
+        guard let url = URL(string: base + "/groups/\(groupId)") else { throw URLError(.badURL) }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(["member_id": memberId])
+        let (_, _) = try await URLSession.shared.data(for: req)
     }
 
     // MARK: - Private

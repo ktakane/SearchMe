@@ -126,14 +126,15 @@ struct CreateGroupSheet: View {
         errorMessage = nil
         Task {
             do {
-                let (group, member) = try await APIService.shared.createGroup(name: groupName, ownerName: name, maxMembers: subManager.planType.maxMembers)
+                let (group, member, isOwner) = try await APIService.shared.createGroup(name: groupName, ownerName: name, maxMembers: subManager.planType.maxMembers)
                 await MainActor.run {
                     appState.register(
                         memberId: member.id,
                         name: name,
                         groupId: group.id,
                         groupName: group.name,
-                        inviteCode: group.inviteCode
+                        inviteCode: group.inviteCode,
+                        isOwner: isOwner
                     )
                     isPresented = false
                 }
@@ -193,7 +194,7 @@ struct JoinGroupSheet: View {
         errorMessage = nil
         Task {
             do {
-                let (group, member) = try await APIService.shared.joinGroup(
+                let (group, member, isOwner) = try await APIService.shared.joinGroup(
                     inviteCode: inviteCode.uppercased(),
                     name: name
                 )
@@ -203,7 +204,8 @@ struct JoinGroupSheet: View {
                         name: name,
                         groupId: group.id,
                         groupName: group.name,
-                        inviteCode: group.inviteCode
+                        inviteCode: group.inviteCode,
+                        isOwner: isOwner
                     )
                     isPresented = false
                 }
