@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var subManager: SubscriptionManager
     @State private var selectedTab = 0
     @State private var showSafetyReminderSheet = false
 
@@ -23,6 +24,15 @@ struct MainTabView: View {
         .accentColor(.orange)
         .onChange(of: appState.showSafetyReminder) { newValue in
             if newValue { showSafetyReminderSheet = true }
+        }
+        .onChange(of: subManager.planType) { newPlan in
+            guard appState.isSetupComplete else { return }
+            Task {
+                try? await APIService.shared.updateGroupPlan(
+                    groupId: appState.groupId,
+                    maxMembers: newPlan.maxMembers
+                )
+            }
         }
         .fullScreenCover(isPresented: $showSafetyReminderSheet) {
             SafetySheet(

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SetupView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var subManager: SubscriptionManager
     @State private var name = ""
     @State private var inviteCode = ""
     @State private var groupName = ""
@@ -70,6 +71,7 @@ struct SetupView: View {
         .sheet(isPresented: $showCreateSheet) {
             CreateGroupSheet(isPresented: $showCreateSheet)
                 .environmentObject(appState)
+                .environmentObject(subManager)
         }
         .sheet(isPresented: $showJoinSheet) {
             JoinGroupSheet(isPresented: $showJoinSheet)
@@ -81,6 +83,7 @@ struct SetupView: View {
 struct CreateGroupSheet: View {
     @Binding var isPresented: Bool
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var subManager: SubscriptionManager
     @State private var name = ""
     @State private var groupName = ""
     @State private var isLoading = false
@@ -123,7 +126,7 @@ struct CreateGroupSheet: View {
         errorMessage = nil
         Task {
             do {
-                let (group, member) = try await APIService.shared.createGroup(name: groupName, ownerName: name)
+                let (group, member) = try await APIService.shared.createGroup(name: groupName, ownerName: name, maxMembers: subManager.planType.maxMembers)
                 await MainActor.run {
                     appState.register(
                         memberId: member.id,
@@ -203,6 +206,11 @@ struct JoinGroupSheet: View {
                         inviteCode: group.inviteCode
                     )
                     isPresented = false
+                }
+            } catch APIError.groupFull(let max) {
+                await MainActor.run {
+                    errorMessage = "グループの人数上限（\(max)名）に達しています"
+                    isLoading = false
                 }
             } catch {
                 await MainActor.run {

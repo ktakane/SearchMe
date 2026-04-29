@@ -23,7 +23,7 @@ enum ProductID {
 
 // MARK: - プランタイプ
 
-enum PlanType {
+enum PlanType: Equatable {
     case none, personal, team, enterprise
 
     var maxMembers: Int {

@@ -1,16 +1,35 @@
 import Foundation
 
+enum APIError: LocalizedError {
+    case groupFull(max: Int)
+    case serverError(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .groupFull(let max):
+            return "グループの人数上限（\(max)名）に達しています"
+        case .serverError(let code):
+            return "サーバーエラー (\(code))"
+        }
+    }
+}
+
 final class APIService {
     static let shared = APIService()
     private let base = "https://searchme.skyscanning.jp/api"
 
     private init() {}
 
-    func createGroup(name: String, ownerName: String) async throws -> (FamilyGroup, FamilyMember) {
-        struct CreateResponse: Codable { var group: FamilyGroup; var member: FamilyMember }
-        let body = ["name": name, "owner_name": ownerName]
-        let resp: CreateResponse = try await post(path: "/groups", body: body)
+    func createGroup(name: String, ownerName: String, maxMembers: Int) async throws -> (FamilyGroup, FamilyMember) {
+        struct Body: Encodable { var name: String; var owner_name: String; var max_members: Int }
+        struct Response: Codable { var group: FamilyGroup; var member: FamilyMember }
+        let resp: Response = try await post(path: "/groups", body: Body(name: name, owner_name: ownerName, max_members: maxMembers))
         return (resp.group, resp.member)
+    }
+
+    func updateGroupPlan(groupId: String, maxMembers: Int) async throws {
+        struct Body: Encodable { var max_members: Int }
+        let _: EmptyResponse = try await put(path: "/groups/\(groupId)/plan", body: Body(max_members: maxMembers))
     }
 
     func joinGroup(inviteCode: String, name: String) async throws -> (FamilyGroup, FamilyMember) {
@@ -59,6 +78,7 @@ final class APIService {
     // MARK: - Private
 
     private struct EmptyResponse: Codable {}
+    private struct GroupFullErrorBody: Decodable { var error: String; var max_members: Int? }
 
     private func get<T: Decodable>(path: String) async throws -> T {
         guard let url = URL(string: base + path) else { throw URLError(.badURL) }
@@ -70,6 +90,23 @@ final class APIService {
         guard let url = URL(string: base + path) else { throw URLError(.badURL) }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode == 403 {
+            if let err = try? JSONDecoder().decode(GroupFullErrorBody.self, from: data),
+               err.error == "group is full" {
+                throw APIError.groupFull(max: err.max_members ?? 0)
+            }
+            throw APIError.serverError(403)
+        }
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    private func put<Body: Encodable, T: Decodable>(path: String, body: Body) async throws -> T {
+        guard let url = URL(string: base + path) else { throw URLError(.badURL) }
+        var req = URLRequest(url: url)
+        req.httpMethod = "PUT"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(body)
         let (data, _) = try await URLSession.shared.data(for: req)

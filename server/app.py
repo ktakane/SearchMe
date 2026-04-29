@@ -42,6 +42,10 @@ def migrate_db():
                 conn.execute(f'ALTER TABLE members ADD COLUMN {col} TEXT')
             except Exception:
                 pass
+        try:
+            conn.execute('ALTER TABLE groups ADD COLUMN max_members INTEGER NOT NULL DEFAULT 2')
+        except Exception:
+            pass
 
 def init_db():
     with get_db() as conn:
@@ -50,7 +54,8 @@ def init_db():
                 id          TEXT PRIMARY KEY,
                 name        TEXT NOT NULL,
                 invite_code TEXT UNIQUE NOT NULL,
-                created_at  TEXT NOT NULL
+                created_at  TEXT NOT NULL,
+                max_members INTEGER NOT NULL DEFAULT 2
             );
             CREATE TABLE IF NOT EXISTS members (
                 id          TEXT PRIMARY KEY,
@@ -204,21 +209,26 @@ def poll_earthquake():
 
 # MARK: - グループ
 
+VALID_MAX_MEMBERS = {2, 6, 20, 0}  # 0 = unlimited
+
 @app.route('/api/groups', methods=['POST'])
 def create_group():
-    data = request.get_json()
+    data        = request.get_json()
     name        = data.get('name', '').strip()
     owner_name  = data.get('owner_name', '').strip()
+    max_members = int(data.get('max_members', 2))
     if not name or not owner_name:
         return jsonify({'error': 'name and owner_name are required'}), 400
+    if max_members not in VALID_MAX_MEMBERS:
+        max_members = 2
 
     group_id    = generate_id()
     member_id   = generate_id()
     invite_code = generate_invite_code()
     with get_db() as conn:
         conn.execute(
-            'INSERT INTO groups (id, name, invite_code, created_at) VALUES (?, ?, ?, ?)',
-            (group_id, name, invite_code, now_iso())
+            'INSERT INTO groups (id, name, invite_code, created_at, max_members) VALUES (?, ?, ?, ?, ?)',
+            (group_id, name, invite_code, now_iso(), max_members)
         )
         conn.execute(
             'INSERT INTO members (id, group_id, name) VALUES (?, ?, ?)',
@@ -231,7 +241,7 @@ def create_group():
 
 @app.route('/api/groups/join', methods=['POST'])
 def join_group():
-    data = request.get_json()
+    data        = request.get_json()
     invite_code = data.get('invite_code', '').strip().upper()
     member_name = data.get('name', '').strip()
     if not invite_code or not member_name:
@@ -244,6 +254,14 @@ def join_group():
         if not group:
             return jsonify({'error': 'invalid invite code'}), 404
 
+        max_members = group['max_members']
+        if max_members > 0:
+            current_count = conn.execute(
+                'SELECT COUNT(*) as cnt FROM members WHERE group_id = ?', (group['id'],)
+            ).fetchone()['cnt']
+            if current_count >= max_members:
+                return jsonify({'error': 'group is full', 'max_members': max_members}), 403
+
         member_id = generate_id()
         conn.execute(
             'INSERT INTO members (id, group_id, name) VALUES (?, ?, ?)',
@@ -253,6 +271,16 @@ def join_group():
         'group':  {'id': group['id'], 'name': group['name'], 'inviteCode': group['invite_code']},
         'member': {'id': member_id, 'groupId': group['id'], 'name': member_name, 'isMe': True}
     })
+
+@app.route('/api/groups/<group_id>/plan', methods=['PUT'])
+def update_group_plan(group_id):
+    data        = request.get_json()
+    max_members = int(data.get('max_members', 2))
+    if max_members not in VALID_MAX_MEMBERS:
+        max_members = 2
+    with get_db() as conn:
+        conn.execute('UPDATE groups SET max_members = ? WHERE id = ?', (max_members, group_id))
+    return jsonify({'ok': True})
 
 @app.route('/api/groups/<group_id>/members', methods=['GET'])
 def get_members(group_id):
