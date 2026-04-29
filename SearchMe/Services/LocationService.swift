@@ -12,12 +12,17 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     private let manager = CLLocationManager()
     private var appState: AppState?
 
+    var cachedLocation: CLLocation? { manager.location }
+
     override init() {
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         manager.distanceFilter = 50
         authorizationStatus = manager.authorizationStatus
+        if manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse {
+            manager.requestLocation()
+        }
     }
 
     func setAppState(_ state: AppState) {
@@ -70,15 +75,21 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     // MARK: - CLLocationManagerDelegate
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last,
-              let state = appState,
-              state.isDisasterMode else { return }
+        guard let location = locations.last else { return }
         lastLocation = location
+        guard let state = appState, state.isDisasterMode else { return }
         sendLocation(location, state: state)
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        // requestLocation() failure is non-fatal; lastLocation stays nil
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
+        if authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse {
+            manager.requestLocation()
+        }
     }
 
     // MARK: - Private

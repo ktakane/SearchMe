@@ -195,7 +195,8 @@ final class MapViewModel: ObservableObject {
     @Published var region: MKCoordinateRegion
 
     init() {
-        let center = LocationService.shared.lastLocation?.coordinate
+        let ls = LocationService.shared
+        let center = (ls.lastLocation ?? ls.cachedLocation)?.coordinate
             ?? CLLocationCoordinate2D(latitude: 35.6762, longitude: 139.6503)
         region = MKCoordinateRegion(
             center: center,
