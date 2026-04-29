@@ -24,7 +24,9 @@ targets:
         CFBundleDisplayName: SearchMe
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
-        UILaunchStoryboardName: LaunchScreen
+        UILaunchScreen:
+          UIColorName: systemBackground
+        UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSLocationAlwaysAndWhenInUseUsageDescription: "災害発生時に家族があなたの位置を確認できるようにするため、位置情報へのアクセスが必要です。"
@@ -34,7 +36,6 @@ targets:
           - location
           - fetch
           - remote-notification
-        INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
     entitlements:
       path: SearchMe/SearchMe.entitlements
       properties:
