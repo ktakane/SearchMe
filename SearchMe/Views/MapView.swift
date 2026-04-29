@@ -3,9 +3,11 @@ import MapKit
 
 struct MapView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var subManager: SubscriptionManager
     @StateObject private var viewModel = MapViewModel()
     @State private var showShelters = false
     @State private var selectedShelter: Shelter?
+    @State private var showPaywall = false
 
     var body: some View {
         NavigationView {
@@ -25,8 +27,12 @@ struct MapView: View {
 
                 VStack(spacing: 12) {
                     Button {
-                        showShelters.toggle()
-                        if showShelters { viewModel.loadShelters() }
+                        if subManager.isSubscribed {
+                            showShelters.toggle()
+                            if showShelters { viewModel.loadShelters() }
+                        } else {
+                            showPaywall = true
+                        }
                     } label: {
                         Image(systemName: showShelters ? "building.2.fill" : "building.2")
                             .font(.system(size: 24))
@@ -58,6 +64,9 @@ struct MapView: View {
             }
             .sheet(item: $selectedShelter) { shelter in
                 ShelterDetailSheet(shelter: shelter)
+            }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView().environmentObject(subManager)
             }
         }
     }

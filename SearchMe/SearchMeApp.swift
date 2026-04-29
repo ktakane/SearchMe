@@ -6,11 +6,13 @@ import CoreLocation
 struct SearchMeApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var appState = AppState()
+    @StateObject private var subManager = SubscriptionManager()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .environmentObject(subManager)
                 .onAppear {
                     delegate.appState = appState
                     LocationService.shared.setAppState(appState)
