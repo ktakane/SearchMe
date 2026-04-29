@@ -114,29 +114,29 @@ struct DisbandConfirmSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
+            ScrollView {
+                VStack(spacing: 20) {
+                    Image(systemName: "trash.circle.fill")
+                        .font(.system(size: 64))
+                        .foregroundColor(.red)
+                        .padding(.top, 32)
 
-            VStack(spacing: 20) {
-                Image(systemName: "trash.circle.fill")
-                    .font(.system(size: 64))
-                    .foregroundColor(.red)
+                    Text("「\(groupName)」を解散しますか？")
+                        .font(.title3.bold())
+                        .multilineTextAlignment(.center)
 
-                Text("「\(groupName)」を解散しますか？")
-                    .font(.title3.bold())
-                    .multilineTextAlignment(.center)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    warningRow(icon: "person.badge.minus", text: "グループの全メンバーが強制的に退出されます")
-                    warningRow(icon: "location.slash", text: "全員の位置情報・安否情報が削除されます")
-                    warningRow(icon: "arrow.uturn.backward.slash", text: "この操作は取り消すことができません")
-                    warningRow(icon: "iphone.slash", text: "家族の端末は次回起動時に初期設定画面に戻ります")
+                    VStack(alignment: .leading, spacing: 12) {
+                        warningRow(icon: "person.badge.minus", text: "グループの全メンバーが強制的に退出されます")
+                        warningRow(icon: "location.slash", text: "全員の位置情報・安否情報が削除されます")
+                        warningRow(icon: "arrow.uturn.backward.slash", text: "この操作は取り消すことができません")
+                        warningRow(icon: "iphone.slash", text: "家族の端末は次回起動時に初期設定画面に戻ります")
+                    }
+                    .padding()
+                    .background(.red.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
                 }
-                .padding()
-                .background(.red.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 24)
-
-            Spacer()
 
             VStack(spacing: 12) {
                 Button(role: .destructive, action: onDisband) {
@@ -158,9 +158,11 @@ struct DisbandConfirmSheet: View {
                 }
             }
             .padding(.horizontal, 24)
+            .padding(.top, 8)
             .padding(.bottom, 40)
+            .background(.background)
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     private func warningRow(icon: String, text: String) -> some View {
@@ -171,6 +173,7 @@ struct DisbandConfirmSheet: View {
             Text(text)
                 .font(.subheadline)
                 .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
