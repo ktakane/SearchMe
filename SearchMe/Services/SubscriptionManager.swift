@@ -43,6 +43,14 @@ enum PlanType: Equatable {
         case .enterprise: return "企業"
         }
     }
+
+    var groupLabel: String {
+        switch self {
+        case .none, .personal: return "家族"
+        case .team:            return "チーム"
+        case .enterprise:      return "企業"
+        }
+    }
 }
 
 // MARK: - SubscriptionManager
@@ -58,7 +66,7 @@ final class SubscriptionManager: ObservableObject {
     private var transactionListener: Task<Void, Never>?
 
     #if DEBUG
-    static let debugForceSubscribed = false
+    static let debugForceSubscribed = true
     #endif
 
     init() {

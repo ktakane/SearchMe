@@ -27,7 +27,7 @@ struct FamilyListView: View {
                     }
                 }
             }
-            .navigationTitle("家族一覧")
+            .navigationTitle("\(subManager.planType.groupLabel)一覧")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if isLoading {
@@ -55,7 +55,7 @@ struct FamilyListView: View {
                     .font(.title2)
                     .foregroundColor(.orange)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("家族ダッシュボード")
+                    Text("\(subManager.planType.groupLabel)ダッシュボード")
                         .font(.subheadline.bold())
                         .foregroundColor(.primary)
                     Text("安否状況・バッテリーを一覧で確認")

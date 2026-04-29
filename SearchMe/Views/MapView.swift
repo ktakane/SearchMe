@@ -53,7 +53,7 @@ struct MapView: View {
                 }
                 .padding(24)
             }
-            .navigationTitle("家族マップ")
+            .navigationTitle("\(subManager.planType.groupLabel)マップ")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if viewModel.isLoading { ProgressView() }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var subManager: SubscriptionManager
     @State private var members: [FamilyMember] = []
     @State private var isLoading = false
 
@@ -22,7 +23,7 @@ struct DashboardView: View {
                 }
                 .padding()
             }
-            .navigationTitle("家族ダッシュボード")
+            .navigationTitle("\(subManager.planType.groupLabel)ダッシュボード")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if isLoading {

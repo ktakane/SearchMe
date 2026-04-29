@@ -21,7 +21,7 @@ struct MainTabView: View {
                     FamilyListView()
                 }
             }
-            .tabItem { Label("家族", systemImage: "person.3.fill") }
+            .tabItem { Label(subManager.planType.groupLabel, systemImage: "person.3.fill") }
             .tag(2)
             SettingsView()
                 .tabItem { Label("設定", systemImage: "gearshape.fill") }
