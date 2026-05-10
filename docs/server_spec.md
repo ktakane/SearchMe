@@ -23,7 +23,14 @@
 | name | TEXT | グループ名 |
 | invite_code | TEXT (UNIQUE) | 招待コード（英大文字+数字6桁） |
 | created_at | TEXT | 作成日時（ISO8601 JST） |
-| max_members | INTEGER | 最大人数（2/6/20/0=無制限） |
+| max_members | INTEGER | 最大人数（2=無償版 / 6=家族プラン / 20=グループプラン）。サブスク登録時に productId から自動導出 |
+| owner_member_id | TEXT | グループオーナーのメンバーID（作成者）。サブスク権利者と一致 |
+| original_transaction_id | TEXT (UNIQUE) | Apple `originalTransactionId`。1 Apple ID = 1 オーナーグループ制約のためユニーク |
+| subscription_product_id | TEXT | 購入商品ID（例: `com.skyscanning.searchme.personal.monthly`） |
+| subscription_status | TEXT | `active` / `expired` / `revoked` / `in_grace` / `in_billing_retry` / `none` |
+| subscription_expires_at | TEXT | 現在の請求期間の終了日時（ISO8601 JST） |
+| subscription_last_verified_at | TEXT | Apple サーバーで最後に検証した日時 |
+| subscription_environment | TEXT | `Production` / `Sandbox` |
 | owner_member_id | TEXT | オーナーのメンバーID |
 
 ### members テーブル
@@ -177,10 +184,103 @@
 #### PUT /api/groups/{group_id}/plan
 グループの最大人数を更新する（プラン変更時）。
 
+> **互換性のために残置**。新クライアントは `/api/subscription/register` 経由でプランを更新する。サーバー側の Apple 検証を経ないため、運用ログで監視する。
+
 **リクエスト**
 ```json
 { "max_members": 20 }
 ```
+
+---
+
+#### POST /api/subscription/register
+オーナー購入直後にクライアントから JWS Transaction を受け取り、Apple サーバーで検証してグループに紐付ける。
+
+**リクエスト**
+```json
+{
+  "group_id": "...",
+  "owner_member_id": "...",
+  "jws_representation": "eyJhbGc..."
+}
+```
+
+**処理**
+1. JWS をデコードし `originalTransactionId` `productId` `environment` を取得
+2. グループのオーナー一致を確認
+3. `original_transaction_id` が他グループで使用中なら 409
+4. App Store Server API で当該 transaction の状態を取得（active 必須）
+5. グループにサブスク情報を保存。`max_members` は productId から自動導出
+
+**レスポンス**
+```json
+{
+  "ok": true,
+  "planType": "personal",
+  "maxMembers": 6,
+  "subscriptionStatus": "active",
+  "expiresAt": "2026-06-09T12:34:56+09:00"
+}
+```
+
+**エラー**
+- 400: パラメータ不足 / JWS 不正 / 未知の productId
+- 401: Apple 側で active でない
+- 403: オーナー不一致 or メンバーでない
+- 404: グループが存在しない
+- 409: `original_transaction_id` が他グループで使用中
+- 502: Apple サーバーへの問い合わせ失敗
+
+---
+
+#### GET /api/groups/{group_id}/subscription
+クライアントの機能ゲート判定用。グループの現在のサブスク状態を返す。アプリ起動時・タブ切替時に呼ばれる想定。
+
+**レスポンス**
+```json
+{
+  "isActive":      true,
+  "planType":      "personal",
+  "maxMembers":    6,
+  "expiresAt":     "2026-06-09T12:34:56+09:00",
+  "ownerMemberId": "...",
+  "status":        "active"
+}
+```
+
+`isActive=true` の場合、グループ全メンバーが有償機能（避難所マップ・移動履歴・ダッシュボード）を利用可能。`status` は `active` / `expired` / `revoked` / `in_grace` / `in_billing_retry` / `none`。
+
+**エラー**
+- 404: グループが存在しない
+
+---
+
+#### POST /api/subscription/notifications
+App Store Server Notifications V2 受信用 Webhook。Apple から push される。
+
+**リクエスト**（Apple から）
+```json
+{ "signedPayload": "<JWS>" }
+```
+
+**処理**
+1. signedPayload を検証してデコード
+2. `notificationType` に応じて DB の `subscription_status` を更新
+   - `SUBSCRIBED` / `DID_RENEW` / `OFFER_REDEEMED` → `active`
+   - `EXPIRED` / `GRACE_PERIOD_EXPIRED` → `expired`
+   - `REVOKE` / `REFUND` → `revoked`（即時ロック）
+   - `DID_FAIL_TO_RENEW` → `in_billing_retry`（subtype が `GRACE_PERIOD` なら `in_grace`）
+3. 200 を返す（500 を返すと Apple が再送する）
+
+**App Store Connect 設定**
+- Production Server URL: `https://searchme.skyscanning.jp/api/subscription/notifications`
+- Sandbox Server URL: 同上（環境はペイロード内 `environment` で判別）
+- Version: V2
+
+---
+
+#### バックグラウンドポーリング
+`poll_subscription_status()` が起動時にデーモンスレッドとして動き、1時間毎に `original_transaction_id` を持つ全グループに対して App Store Server API で状態を再検証する。Webhook の取りこぼしに備えた二重防御。
 
 ---
 

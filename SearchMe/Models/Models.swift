@@ -58,6 +58,15 @@ struct FamilyGroup: Codable {
     var inviteCode: String
 }
 
+struct GroupSubscription: Codable {
+    var isActive: Bool
+    var planType: String      // "none" / "personal" / "team"
+    var maxMembers: Int
+    var expiresAt: String?
+    var ownerMemberId: String?
+    var status: String        // "active" / "expired" / "revoked" / "in_grace" / "in_billing_retry" / "none"
+}
+
 struct LocationPayload: Codable {
     var memberId: String
     var groupId: String

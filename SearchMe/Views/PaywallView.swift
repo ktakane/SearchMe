@@ -4,26 +4,76 @@ import StoreKit
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var subManager: SubscriptionManager
-    @State private var isYearly = false
-
-    private let plans: [(title: String, subtitle: String, icon: String, color: Color,
-                         monthlyID: String, yearlyID: String)] = [
-        ("個人・家族", "〜6名まで", "person.2.fill", .orange,
-         ProductID.personalMonthly, ProductID.personalYearly),
-        ("チーム", "〜20名まで", "person.3.fill", .blue,
-         ProductID.teamMonthly, ProductID.teamYearly),
-        ("企業", "人数無制限", "building.2.fill", .purple,
-         ProductID.enterpriseMonthly, ProductID.enterpriseYearly),
-    ]
 
     var body: some View {
+        if #available(iOS 17.0, *) {
+            modernPaywall
+        } else {
+            legacyPaywall
+        }
+    }
+
+    // MARK: - iOS 17+ SubscriptionStoreView（Apple推奨）
+
+    @available(iOS 17.0, *)
+    private var modernPaywall: some View {
+        SubscriptionStoreView(productIDs: [
+            ProductID.personalMonthly, ProductID.personalYearly,
+            ProductID.teamMonthly,     ProductID.teamYearly
+        ]) {
+            marketingContent
+        }
+        .subscriptionStoreButtonLabel(.multiline)
+        .subscriptionStorePickerItemBackground(.thinMaterial)
+        .storeButton(.visible, for: .restorePurchases, .cancellation)
+        .subscriptionStorePolicyDestination(
+            url: URL(string: "https://skyscanning.jp/privacy-policy/")!,
+            for: .privacyPolicy
+        )
+        .subscriptionStorePolicyDestination(
+            url: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!,
+            for: .termsOfService
+        )
+        .onInAppPurchaseCompletion { _, result in
+            if case .success(let purchaseResult) = result,
+               case .success = purchaseResult {
+                await subManager.refresh()
+                dismiss()
+            }
+        }
+    }
+
+    // MARK: - マーケティングコンテンツ（iOS 17+ ヘッダー）
+
+    private var marketingContent: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "star.circle.fill")
+                .font(.system(size: 56))
+                .foregroundColor(.orange)
+            Text("プレミアム機能を解放")
+                .font(.title2.bold())
+            VStack(alignment: .leading, spacing: 6) {
+                FeatureRow(icon: "building.2.fill", text: "全国12万件の避難所マップ")
+                FeatureRow(icon: "map.fill",        text: "移動履歴の確認")
+                FeatureRow(icon: "clock.fill",      text: "位置情報の長期保存")
+                FeatureRow(icon: "chart.bar.fill",  text: "家族ダッシュボード")
+            }
+            .padding()
+            .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(.top)
+    }
+
+    // MARK: - iOS 16 フォールバック（既存カスタムUI）
+
+    private var legacyPaywall: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    header
-                    billingToggle
-                    planCards
-                    restoreButton
+                    legacyHeader
+                    legacyBillingToggle
+                    legacyPlanCards
+                    legacyFooter
                     if let error = subManager.errorMessage {
                         Text(error).foregroundColor(.red).font(.caption)
                     }
@@ -40,9 +90,19 @@ struct PaywallView: View {
         }
     }
 
-    // MARK: - Header
+    // -- Legacy: ヘッダー --
 
-    private var header: some View {
+    @State private var isYearly = false
+
+    private let legacyPlans: [(title: String, subtitle: String, icon: String, color: Color,
+                                monthlyID: String, yearlyID: String)] = [
+        ("家族プラン",   "オーナー＋5名まで",  "person.2.fill", .orange,
+         ProductID.personalMonthly, ProductID.personalYearly),
+        ("グループプラン", "オーナー＋19名まで", "person.3.fill", .blue,
+         ProductID.teamMonthly,     ProductID.teamYearly),
+    ]
+
+    private var legacyHeader: some View {
         VStack(spacing: 12) {
             Image(systemName: "star.circle.fill")
                 .font(.system(size: 56))
@@ -50,27 +110,27 @@ struct PaywallView: View {
             Text("プレミアム機能を解放")
                 .font(.title2.bold())
             VStack(alignment: .leading, spacing: 6) {
-                FeatureRow(icon: "building.2.fill",   text: "全国12万件の避難所マップ")
-                FeatureRow(icon: "map.fill",          text: "移動履歴の確認")
-                FeatureRow(icon: "clock.fill",        text: "位置情報の長期保存")
-                FeatureRow(icon: "chart.bar.fill",    text: "家族ダッシュボード")
+                FeatureRow(icon: "building.2.fill", text: "全国12万件の避難所マップ")
+                FeatureRow(icon: "map.fill",        text: "移動履歴の確認")
+                FeatureRow(icon: "clock.fill",      text: "位置情報の長期保存")
+                FeatureRow(icon: "chart.bar.fill",  text: "家族ダッシュボード")
             }
             .padding()
             .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
         }
     }
 
-    // MARK: - 月額/年額トグル
+    // -- Legacy: 月額/年額トグル --
 
-    private var billingToggle: some View {
+    private var legacyBillingToggle: some View {
         HStack(spacing: 0) {
-            toggleTab(label: "月額", selected: !isYearly) { isYearly = false }
-            toggleTab(label: "年額（お得）", selected: isYearly) { isYearly = true }
+            legacyToggleTab(label: "月額", selected: !isYearly) { isYearly = false }
+            legacyToggleTab(label: "年額（お得）", selected: isYearly) { isYearly = true }
         }
         .background(.gray.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    private func toggleTab(label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func legacyToggleTab(label: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
                 .font(.subheadline.bold())
@@ -83,13 +143,14 @@ struct PaywallView: View {
         .padding(3)
     }
 
-    // MARK: - プランカード
+    // -- Legacy: プランカード --
 
-    private var planCards: some View {
+    private var legacyPlanCards: some View {
         VStack(spacing: 16) {
-            ForEach(plans, id: \.title) { plan in
+            ForEach(legacyPlans, id: \.title) { plan in
                 let productID = isYearly ? plan.yearlyID : plan.monthlyID
-                let product = subManager.product(for: productID)
+                let product   = subManager.product(for: productID)
+                let hasTrial  = product?.subscription?.introductoryOffer?.paymentMode == .freeTrial
                 PlanCard(
                     title:     plan.title,
                     subtitle:  plan.subtitle,
@@ -97,6 +158,7 @@ struct PaywallView: View {
                     color:     plan.color,
                     priceText: product?.displayPrice ?? "---",
                     period:    isYearly ? "/ 1年（自動更新）" : "/ 1ヶ月（自動更新）",
+                    trialText: hasTrial ? "初月無料" : nil,
                     isLoading: subManager.isPurchasing,
                     onTap: {
                         guard let p = product else { return }
@@ -107,9 +169,9 @@ struct PaywallView: View {
         }
     }
 
-    // MARK: - 復元・リンク
+    // -- Legacy: フッター --
 
-    private var restoreButton: some View {
+    private var legacyFooter: some View {
         VStack(spacing: 12) {
             Text(isYearly
                  ? "プランは1年ごとに自動更新されます。次の更新日の24時間前までにキャンセルしない限り、自動的に課金されます。"
@@ -127,12 +189,14 @@ struct PaywallView: View {
             }
 
             HStack(spacing: 16) {
-                Link("利用規約", destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+                Link("利用規約",
+                     destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
                 Text("・").foregroundColor(.secondary)
-                Link("プライバシーポリシー", destination: URL(string: "https://skyscanning.jp/privacy-policy/")!)
+                Link("プライバシーポリシー",
+                     destination: URL(string: "https://skyscanning.jp/privacy-policy/")!)
             }
             .font(.caption)
-            .foregroundColor(.secondary)
+            .foregroundColor(.blue)
         }
     }
 }
@@ -157,6 +221,7 @@ struct PlanCard: View {
     let color: Color
     let priceText: String
     let period: String
+    let trialText: String?
     let isLoading: Bool
     let onTap: () -> Void
 
@@ -168,7 +233,17 @@ struct PlanCard: View {
                     Image(systemName: icon).foregroundColor(color).font(.title3)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.headline)
+                    HStack(spacing: 6) {
+                        Text(title).font(.headline)
+                        if let trial = trialText {
+                            Text(trial)
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.green.opacity(0.15), in: Capsule())
+                                .foregroundColor(.green)
+                        }
+                    }
                     Text(subtitle).font(.caption).foregroundColor(.secondary)
                 }
                 Spacer()

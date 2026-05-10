@@ -1,0 +1,155 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "ja_JP",
+        "policyText" : "",
+        "policyURL" : "https://skyscanning.jp/privacy-policy/"
+      }
+    ]
+  },
+  "identifier" : "D8C121F9",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6764507036",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_developerTeamID" : "5N3593DK92",
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 799849517.78503394,
+    "_locale" : "ja_JP",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "JPN",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "A1B2C3D4-0001-0001-0001-A1B2C3D4E5F6",
+      "localizations" : [
+        {
+          "description" : "SearchMe プレミアムプラン",
+          "displayName" : "SearchMe プレミアムプラン",
+          "locale" : "ja_JP"
+        }
+      ],
+      "name" : "SearchMe Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "600",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "E5F6A7B8-0001-0001-0001-E5F6A7B8C9D0",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "",
+              "displayName" : "家族プラン 月額",
+              "locale" : "ja_JP"
+            }
+          ],
+          "productID" : "com.skyscanning.searchme.personal.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "家族プラン 月額",
+          "subscriptionGroupID" : "A1B2C3D4-0001-0001-0001-A1B2C3D4E5F6",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "6000",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "C9D0E1F2-0002-0002-0002-C9D0E1F2A3B4",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "",
+              "displayName" : "家族プラン 年額",
+              "locale" : "ja_JP"
+            }
+          ],
+          "productID" : "com.skyscanning.searchme.personal.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "家族プラン 年額",
+          "subscriptionGroupID" : "A1B2C3D4-0001-0001-0001-A1B2C3D4E5F6",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2000",
+          "familyShareable" : false,
+          "groupNumber" : 3,
+          "internalID" : "A3B4C5D6-0003-0003-0003-A3B4C5D6E7F8",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "",
+              "displayName" : "グループプラン 月額",
+              "locale" : "ja_JP"
+            }
+          ],
+          "productID" : "com.skyscanning.searchme.team.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "グループプラン 月額",
+          "subscriptionGroupID" : "A1B2C3D4-0001-0001-0001-A1B2C3D4E5F6",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "20000",
+          "familyShareable" : false,
+          "groupNumber" : 4,
+          "internalID" : "E7F8A9B0-0004-0004-0004-E7F8A9B0C1D2",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "",
+              "displayName" : "グループプラン 年額",
+              "locale" : "ja_JP"
+            }
+          ],
+          "productID" : "com.skyscanning.searchme.team.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "グループプラン 年額",
+          "subscriptionGroupID" : "A1B2C3D4-0001-0001-0001-A1B2C3D4E5F6",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 5,
+    "minor" : 0
+  }
+}

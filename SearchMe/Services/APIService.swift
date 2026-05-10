@@ -42,6 +42,24 @@ final class APIService {
         let _: EmptyResponse = try await put(path: "/groups/\(groupId)/plan", body: Body(max_members: maxMembers))
     }
 
+    // MARK: - サブスクリプション
+
+    func registerSubscription(groupId: String, ownerMemberId: String, jwsRepresentation: String) async throws {
+        struct Body: Encodable {
+            var group_id: String
+            var owner_member_id: String
+            var jws_representation: String
+        }
+        let _: EmptyResponse = try await post(
+            path: "/subscription/register",
+            body: Body(group_id: groupId, owner_member_id: ownerMemberId, jws_representation: jwsRepresentation)
+        )
+    }
+
+    func fetchGroupSubscription(groupId: String) async throws -> GroupSubscription {
+        return try await get(path: "/groups/\(groupId)/subscription")
+    }
+
     func joinGroup(inviteCode: String, name: String) async throws -> (FamilyGroup, FamilyMember, Bool) {
         struct JoinResponse: Codable { var group: FamilyGroup; var member: FamilyMember; var isOwner: Bool }
         let body = ["invite_code": inviteCode, "name": name]

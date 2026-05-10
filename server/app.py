@@ -12,6 +12,8 @@ import httpx
 import requests
 from datetime import datetime, timedelta, timezone
 
+import app_store_api
+
 app = Flask(__name__)
 CORS(app)
 
@@ -44,6 +46,27 @@ def migrate_db():
                 pass
         try:
             conn.execute('ALTER TABLE groups ADD COLUMN max_members INTEGER NOT NULL DEFAULT 2')
+        except Exception:
+            pass
+        for col_def in (
+            'owner_member_id TEXT',
+            'original_transaction_id TEXT',
+            'subscription_product_id TEXT',
+            'subscription_status TEXT',
+            'subscription_expires_at TEXT',
+            'subscription_last_verified_at TEXT',
+            'subscription_environment TEXT',
+        ):
+            try:
+                conn.execute(f'ALTER TABLE groups ADD COLUMN {col_def}')
+            except Exception:
+                pass
+        try:
+            conn.execute(
+                'CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_orig_tx '
+                'ON groups (original_transaction_id) '
+                'WHERE original_transaction_id IS NOT NULL'
+            )
         except Exception:
             pass
         conn.executescript('''
@@ -251,8 +274,9 @@ def create_group():
     invite_code = generate_invite_code()
     with get_db() as conn:
         conn.execute(
-            'INSERT INTO groups (id, name, invite_code, created_at, max_members) VALUES (?, ?, ?, ?, ?)',
-            (group_id, name, invite_code, now_iso(), max_members)
+            'INSERT INTO groups (id, name, invite_code, created_at, max_members, owner_member_id) '
+            'VALUES (?, ?, ?, ?, ?, ?)',
+            (group_id, name, invite_code, now_iso(), max_members, member_id)
         )
         conn.execute(
             'INSERT INTO members (id, group_id, name) VALUES (?, ?, ?)',
@@ -298,6 +322,7 @@ def join_group():
 
 @app.route('/api/groups/<group_id>/plan', methods=['PUT'])
 def update_group_plan(group_id):
+    # 互換のため残す。新クライアントは /api/subscription/register 経由で max_members を更新する。
     data        = request.get_json()
     max_members = int(data.get('max_members', 2))
     if max_members not in VALID_MAX_MEMBERS:
@@ -305,6 +330,258 @@ def update_group_plan(group_id):
     with get_db() as conn:
         conn.execute('UPDATE groups SET max_members = ? WHERE id = ?', (max_members, group_id))
     return jsonify({'ok': True})
+
+# MARK: - サブスクリプション
+
+def _expires_iso(expires_date_ms):
+    if not expires_date_ms:
+        return None
+    return datetime.fromtimestamp(int(expires_date_ms) / 1000, tz=JST).isoformat()
+
+
+def _is_active_status(status_label: str) -> bool:
+    return status_label in ('active', 'in_grace', 'in_billing_retry')
+
+
+@app.route('/api/subscription/register', methods=['POST'])
+def register_subscription():
+    """オーナー購入直後にクライアントから JWS Transaction を受け取り、
+    Apple サーバーで検証してグループに紐付ける。
+    """
+    data = request.get_json() or {}
+    group_id          = data.get('group_id', '').strip()
+    owner_member_id   = data.get('owner_member_id', '').strip()
+    jws_representation = data.get('jws_representation', '').strip()
+
+    if not group_id or not owner_member_id or not jws_representation:
+        return jsonify({'error': 'group_id, owner_member_id, jws_representation are required'}), 400
+
+    # JWS をデコードして originalTransactionId / productId / environment を取り出す
+    try:
+        tx = app_store_api.decode_jws(jws_representation)
+    except Exception as e:
+        return jsonify({'error': f'invalid jws: {e}'}), 400
+
+    original_tx_id = tx.get('originalTransactionId')
+    product_id     = tx.get('productId')
+    environment    = tx.get('environment', 'Production')
+    if not original_tx_id or not product_id:
+        return jsonify({'error': 'jws missing originalTransactionId or productId'}), 400
+
+    plan = app_store_api.plan_from_product(product_id)
+    if not plan:
+        return jsonify({'error': f'unknown product_id: {product_id}'}), 400
+    plan_type, max_members = plan
+
+    with get_db() as conn:
+        group = conn.execute('SELECT * FROM groups WHERE id = ?', (group_id,)).fetchone()
+        if not group:
+            return jsonify({'error': 'group not found'}), 404
+
+        # オーナー検証: 既知のオーナーがいる場合は一致を要求、未設定なら今回のmemberで上書き
+        existing_owner = group['owner_member_id'] if 'owner_member_id' in group.keys() else None
+        if existing_owner and existing_owner != owner_member_id:
+            return jsonify({'error': 'requestor is not the group owner'}), 403
+
+        member = conn.execute(
+            'SELECT 1 FROM members WHERE id = ? AND group_id = ?',
+            (owner_member_id, group_id)
+        ).fetchone()
+        if not member:
+            return jsonify({'error': 'owner_member_id is not a member of the group'}), 403
+
+        # 1 Apple ID = 1 オーナーグループ制約
+        existing = conn.execute(
+            'SELECT id FROM groups WHERE original_transaction_id = ? AND id != ?',
+            (original_tx_id, group_id)
+        ).fetchone()
+        if existing:
+            return jsonify({
+                'error': 'this subscription is already linked to another group',
+                'conflicting_group_id': existing['id']
+            }), 409
+
+    # Apple サーバーで現在の状態を確認
+    status = app_store_api.get_subscription_status(original_tx_id, environment=environment)
+    if not status:
+        return jsonify({'error': 'failed to verify with App Store'}), 502
+
+    status_label = app_store_api.status_label(status['status'])
+    if not _is_active_status(status_label):
+        return jsonify({'error': f'subscription is not active: {status_label}'}), 401
+
+    expires_at = _expires_iso(status.get('expires_date_ms'))
+
+    with get_db() as conn:
+        conn.execute('''
+            UPDATE groups
+            SET owner_member_id = ?,
+                original_transaction_id = ?,
+                subscription_product_id = ?,
+                subscription_status = ?,
+                subscription_expires_at = ?,
+                subscription_last_verified_at = ?,
+                subscription_environment = ?,
+                max_members = ?
+            WHERE id = ?
+        ''', (
+            owner_member_id, original_tx_id, product_id,
+            status_label, expires_at, now_iso(), environment,
+            max_members, group_id
+        ))
+
+    return jsonify({
+        'ok': True,
+        'planType': plan_type,
+        'maxMembers': max_members,
+        'subscriptionStatus': status_label,
+        'expiresAt': expires_at,
+    })
+
+
+@app.route('/api/groups/<group_id>/subscription', methods=['GET'])
+def get_group_subscription(group_id):
+    """クライアントの機能ゲート判定用。グループの現在のサブスク状態を返す。"""
+    with get_db() as conn:
+        group = conn.execute('SELECT * FROM groups WHERE id = ?', (group_id,)).fetchone()
+    if not group:
+        return jsonify({'error': 'group not found'}), 404
+
+    keys = group.keys()
+    status_label = group['subscription_status'] if 'subscription_status' in keys else None
+    product_id   = group['subscription_product_id'] if 'subscription_product_id' in keys else None
+    expires_at   = group['subscription_expires_at'] if 'subscription_expires_at' in keys else None
+    owner_id     = group['owner_member_id'] if 'owner_member_id' in keys else None
+
+    plan_type = 'none'
+    if product_id:
+        plan = app_store_api.plan_from_product(product_id)
+        if plan:
+            plan_type = plan[0]
+
+    is_active = _is_active_status(status_label or '')
+
+    return jsonify({
+        'isActive':      is_active,
+        'planType':      plan_type if is_active else 'none',
+        'maxMembers':    group['max_members'],
+        'expiresAt':     expires_at,
+        'ownerMemberId': owner_id,
+        'status':        status_label or 'none',
+    })
+
+
+@app.route('/api/subscription/notifications', methods=['POST'])
+def subscription_notifications():
+    """App Store Server Notifications V2 受信用 Webhook。"""
+    data = request.get_json(silent=True) or {}
+    signed_payload = data.get('signedPayload')
+    if not signed_payload:
+        return jsonify({'error': 'signedPayload required'}), 400
+
+    try:
+        notification = app_store_api.verify_notification(signed_payload)
+    except Exception as e:
+        print(f'[Notifications] verify failed: {e}')
+        return jsonify({'error': 'invalid payload'}), 400
+
+    notification_type = notification.get('notificationType')
+    subtype           = notification.get('subtype')
+    notif_data        = notification.get('data', {})
+    signed_tx         = notif_data.get('signedTransactionInfo')
+    environment       = notif_data.get('environment', 'Production')
+
+    tx = {}
+    if signed_tx:
+        try:
+            tx = app_store_api.decode_jws(signed_tx)
+        except Exception as e:
+            print(f'[Notifications] decode_jws failed: {e}')
+
+    original_tx_id = tx.get('originalTransactionId')
+    product_id     = tx.get('productId')
+    expires_ms     = tx.get('expiresDate')
+
+    if not original_tx_id:
+        # 状態更新できないが200で返す（Appleの再送を止める）
+        print(f'[Notifications] {notification_type}/{subtype}: no originalTransactionId')
+        return jsonify({'ok': True})
+
+    # 通知タイプから内部ステータスを決定
+    new_status = None
+    if notification_type in ('SUBSCRIBED', 'DID_RENEW', 'OFFER_REDEEMED'):
+        new_status = 'active'
+    elif notification_type == 'EXPIRED':
+        new_status = 'expired'
+    elif notification_type in ('REVOKE', 'REFUND'):
+        new_status = 'revoked'
+    elif notification_type == 'GRACE_PERIOD_EXPIRED':
+        new_status = 'expired'
+    elif notification_type == 'DID_FAIL_TO_RENEW':
+        new_status = 'in_billing_retry' if subtype != 'GRACE_PERIOD' else 'in_grace'
+    elif notification_type == 'DID_CHANGE_RENEWAL_STATUS':
+        # 自動更新ON/OFF切替。状態は変えず最終検証時刻だけ更新
+        pass
+
+    expires_at = _expires_iso(expires_ms)
+
+    with get_db() as conn:
+        if new_status:
+            conn.execute('''
+                UPDATE groups
+                SET subscription_status = ?,
+                    subscription_expires_at = ?,
+                    subscription_last_verified_at = ?,
+                    subscription_environment = ?
+                WHERE original_transaction_id = ?
+            ''', (new_status, expires_at, now_iso(), environment, original_tx_id))
+        else:
+            conn.execute('''
+                UPDATE groups
+                SET subscription_last_verified_at = ?
+                WHERE original_transaction_id = ?
+            ''', (now_iso(), original_tx_id))
+
+    print(f'[Notifications] {notification_type}/{subtype} -> {new_status} ({original_tx_id})')
+    return jsonify({'ok': True})
+
+
+def poll_subscription_status():
+    """全有効グループのサブスク状態を Apple サーバーで定期検証する。
+
+    Webhook の取りこぼしに備えて1時間毎に状態を再同期する。
+    """
+    print('[サブスク監視] 開始')
+    while True:
+        try:
+            with get_db() as conn:
+                rows = conn.execute('''
+                    SELECT id, original_transaction_id, subscription_environment
+                    FROM groups
+                    WHERE original_transaction_id IS NOT NULL
+                ''').fetchall()
+            for row in rows:
+                orig_tx = row['original_transaction_id']
+                env     = row['subscription_environment'] or 'Production'
+                try:
+                    status = app_store_api.get_subscription_status(orig_tx, environment=env)
+                    if not status:
+                        continue
+                    label = app_store_api.status_label(status['status'])
+                    expires_at = _expires_iso(status.get('expires_date_ms'))
+                    with get_db() as conn:
+                        conn.execute('''
+                            UPDATE groups
+                            SET subscription_status = ?,
+                                subscription_expires_at = ?,
+                                subscription_last_verified_at = ?
+                            WHERE id = ?
+                        ''', (label, expires_at, now_iso(), row['id']))
+                except Exception as e:
+                    print(f'[サブスク監視] {orig_tx}: {e}')
+        except Exception as e:
+            print(f'[サブスク監視] エラー: {e}')
+        time.sleep(3600)  # 1時間
 
 @app.route('/api/groups/<group_id>/members', methods=['GET'])
 def get_members(group_id):
@@ -680,6 +957,10 @@ cleanup_old_history()
 # 地震監視スレッドを起動
 earthquake_thread = threading.Thread(target=poll_earthquake, daemon=True)
 earthquake_thread.start()
+
+# サブスク監視スレッドを起動
+subscription_thread = threading.Thread(target=poll_subscription_status, daemon=True)
+subscription_thread.start()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5004, debug=False)

@@ -16,6 +16,7 @@ struct SearchMeApp: App {
                 .onAppear {
                     delegate.appState = appState
                     LocationService.shared.setAppState(appState)
+                    subManager.bind(appState: appState)
                     Task { await ShelterService.shared.checkAndUpdateIfNeeded() }
                 }
         }

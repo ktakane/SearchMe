@@ -34,10 +34,10 @@
 |---|---|---|
 | ホーム | HomeView | 災害モードの開始・停止、安否報告 |
 | マップ | MapView | 家族の位置をリアルタイム表示 |
-| 家族/チーム | DashboardView（有償）/ FamilyListView（無償） | メンバー一覧・安否状況 |
+| 家族/グループ | DashboardView（有償）/ FamilyListView（無償） | メンバー一覧・安否状況 |
 | 設定 | SettingsView | グループ設定・退出・解散 |
 
-タブのラベル（「家族」「チーム」「企業」）はプランに応じて変化する。
+タブのラベル（「家族」「グループ」）はプランに応じて変化する。
 
 ---
 
@@ -133,22 +133,30 @@
 
 ### ペイウォール画面（PaywallView）
 
-- 個人・家族 / チーム / 企業の3プランを表示
+- 家族プラン / グループプランの2プランを表示
 - 月額・年額の切り替えタブ
+- 初月無料（Introductory Offer 適用時のみ「初月無料」バッジを動的表示）
 - 購入・復元ボタン
+
+> 旧「企業プラン」は廃止。`PlanType.enterprise` および関連 ProductID はソースコードに残るが、StoreKit/App Store Connect では非販売。
 
 ---
 
 ## サブスクリプション
 
-| プラン | 最大人数 | 月額 | 年額 |
-|---|---|---|---|
-| 無償版 | 2名 | - | - |
-| 個人・家族 | 6名 | ¥600 | ¥6,000 |
-| チーム | 20名 | ¥2,000 | ¥20,000 |
-| 企業 | 無制限 | ¥10,000 | ¥100,000 |
+| プラン | 最大人数 | 月額 | 年額 | 試用 |
+|---|---|---|---|---|
+| 無償版 | 2名（オーナー＋1名） | - | - | - |
+| 家族プラン | 6名 | ¥600 | ¥6,000 | 初月無料 |
+| グループプラン | 20名 | ¥2,000 | ¥20,000 | 初月無料 |
 
 有償版の機能: 避難所マップ・移動履歴・ダッシュボード
+
+**StoreKit商品ID**
+- `com.skyscanning.searchme.personal.monthly` / `.personal.yearly`（家族プラン）
+- `com.skyscanning.searchme.team.monthly` / `.team.yearly`（グループプラン）
+
+> 旧「企業プラン」（`com.skyscanning.searchme.enterprise.*`）は廃止。`SubscriptionManager.swift` の `PlanType.enterprise` および `ProductID.enterprise*` 定義はコードに残るが、StoreKit構成ファイルからは削除済みで App Store では販売しない。
 
 ---
 
